@@ -1,0 +1,8 @@
+﻿AccessModifierOffset: '-4'
+AllowShortFunctionsOnASingleLine: Empty
+ColumnLimit: '180'
+IndentWidth: '4'
+Language: Cpp
+PointerAlignment: Left
+TabWidth: '4'
+UseTab: Always
