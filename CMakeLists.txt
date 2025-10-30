@@ -1,0 +1,16 @@
+cmake_minimum_required( VERSION 3.31 )
+set( CMAKE_CXX_STANDARD 20 )
+set( CMAKE_CXX_STANDARD_REQUIRED ON )
+project( drunken_lobster_driving )
+set( BUILD_SHARED_LIBS OFF )
+
+set( SDL_STATIC ON )
+add_subdirectory( ext/SDL EXCLUDE_FROM_ALL )
+add_subdirectory( ext/glm EXCLUDE_FROM_ALL )
+add_subdirectory( ext/json EXCLUDE_FROM_ALL )
+add_subdirectory( ext/fmt EXCLUDE_FROM_ALL )
+
+add_executable( game src/game/game.cpp )
+target_include_directories( game PUBLIC src/game )
+target_compile_definitions( game PUBLIC SDL_ASSERT_LEVEL=2 )
+target_link_libraries( game PUBLIC SDL_uclibc SDL3-static fmt glm nlohmann_json )
