@@ -55,6 +55,7 @@ struct App {
 	SDL_Window* window = nullptr;
 	SDL_Renderer* renderer = nullptr;
 	std::unique_ptr<Session> session;
+	bool showDebugUi = false;
 };
 
 SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[]) {
@@ -100,13 +101,17 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[]) {
 SDL_AppResult SDL_AppEvent(void* appstate, SDL_Event* event) {
 	App* app = static_cast<App*>(appstate);
 
-	ImGui_ImplSDL3_ProcessEvent(event);
+	if (app->showDebugUi) {
+		ImGui_ImplSDL3_ProcessEvent(event);
+	}
 
 	if (event->type == SDL_EVENT_QUIT) {
 		return SDL_APP_SUCCESS;
 	} else if (event->type == SDL_EVENT_WINDOW_DISPLAY_SCALE_CHANGED) {
 		const float main_scale = SDL_GetWindowDisplayScale(app->window);
 		ImGui::GetStyle().FontScaleDpi = main_scale;
+	} else if (event->type == SDL_EVENT_KEY_DOWN && event->key.scancode == SDL_SCANCODE_F1) {
+		app->showDebugUi = !app->showDebugUi;
 	}
 
 	return SDL_APP_CONTINUE;
@@ -131,7 +136,9 @@ SDL_AppResult SDL_AppIterate(void* appstate) {
 	app->session->render();
 
 	ImGui::Render();
-	ImGui_ImplSDLRenderer3_RenderDrawData(ImGui::GetDrawData(), app->renderer);
+	if (app->showDebugUi) {
+		ImGui_ImplSDLRenderer3_RenderDrawData(ImGui::GetDrawData(), app->renderer);
+	}
 
 	const bool present_ok = SDL_RenderPresent(app->renderer);
 	SDL_assert(present_ok);
