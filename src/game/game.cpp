@@ -3,6 +3,9 @@
 #include <SDL3/SDL_main.h>
 #include <SDL3/SDL_render.h>
 #include <glm/glm.hpp>
+#include <imgui.h>
+#include <imgui_impl_sdl3.h>
+#include <imgui_impl_sdlrenderer3.h>
 #include <memory>
 
 using float2 = glm::vec2;
@@ -68,6 +71,26 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[]) {
 	const bool vsync_ok = SDL_SetRenderVSync(app->renderer, 1);
 	SDL_assert(vsync_ok);
 
+	{
+		ImGuiContext* imgui_context = ImGui::CreateContext();
+		SDL_assert(imgui_context);
+
+		ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_DockingEnable;
+
+		const float main_scale = SDL_GetWindowDisplayScale(app->window);
+		ImGui::StyleColorsDark();
+		ImGui::GetStyle().FontScaleDpi = main_scale;
+
+		const ImFont* base_font = ImGui::GetIO().Fonts->AddFontFromFileTTF("fonts/NotoSans-Regular.ttf", 18);
+		SDL_assert(base_font);
+
+		const bool imgui_init1_ok = ImGui_ImplSDL3_InitForSDLRenderer(app->window, app->renderer);
+		SDL_assert(imgui_init1_ok);
+
+		const bool imgui_init2_ok = ImGui_ImplSDLRenderer3_Init(app->renderer);
+		SDL_assert(imgui_init2_ok);
+	}
+
 	app->session.reset(new Session(app->renderer));
 
 	*appstate = app;
@@ -77,8 +100,13 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[]) {
 SDL_AppResult SDL_AppEvent(void* appstate, SDL_Event* event) {
 	App* app = static_cast<App*>(appstate);
 
+	ImGui_ImplSDL3_ProcessEvent(event);
+
 	if (event->type == SDL_EVENT_QUIT) {
 		return SDL_APP_SUCCESS;
+	} else if (event->type == SDL_EVENT_WINDOW_DISPLAY_SCALE_CHANGED) {
+		const float main_scale = SDL_GetWindowDisplayScale(app->window);
+		ImGui::GetStyle().FontScaleDpi = main_scale;
 	}
 
 	return SDL_APP_CONTINUE;
@@ -87,6 +115,13 @@ SDL_AppResult SDL_AppEvent(void* appstate, SDL_Event* event) {
 SDL_AppResult SDL_AppIterate(void* appstate) {
 	App* app = static_cast<App*>(appstate);
 
+	ImGui_ImplSDLRenderer3_NewFrame();
+	ImGui_ImplSDL3_NewFrame();
+	ImGui::NewFrame();
+	ImGui::DockSpaceOverViewport(0, nullptr, ImGuiDockNodeFlags_PassthruCentralNode);
+
+	ImGui::ShowDemoWindow();
+
 	const bool set_color_ok = SDL_SetRenderDrawColorFloat(app->renderer, 0, 0, 0, 1);
 	SDL_assert(set_color_ok);
 
@@ -94,6 +129,9 @@ SDL_AppResult SDL_AppIterate(void* appstate) {
 	SDL_assert(clear_ok);
 
 	app->session->render();
+
+	ImGui::Render();
+	ImGui_ImplSDLRenderer3_RenderDrawData(ImGui::GetDrawData(), app->renderer);
 
 	const bool present_ok = SDL_RenderPresent(app->renderer);
 	SDL_assert(present_ok);
@@ -106,11 +144,15 @@ void SDL_AppQuit(void* appstate, SDL_AppResult result) {
 
 	app->session.reset();
 
-	SDL_DestroyWindow(app->window);
-	app->window = nullptr;
+	ImGui_ImplSDLRenderer3_Shutdown();
+	ImGui_ImplSDL3_Shutdown();
+	ImGui::DestroyContext();
 
 	SDL_DestroyRenderer(app->renderer);
 	app->renderer = nullptr;
+
+	SDL_DestroyWindow(app->window);
+	app->window = nullptr;
 
 	SDL_Quit();
 
