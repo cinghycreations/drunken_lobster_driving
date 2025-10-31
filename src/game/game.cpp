@@ -31,6 +31,14 @@ struct Session {
 		return render_pos;
 	}
 
+	void update() {
+		if (ImGui::Begin("Session")) {
+			ImGui::DragFloat2("Camera Position", &cameraPosition.x, 0.01f);
+			ImGui::DragFloat("Render Scale", &renderScale, 0.01f, 0.01f, 10);
+		}
+		ImGui::End();
+	}
+
 	void render() {
 		const bool set_color_ok = SDL_SetRenderDrawColorFloat(renderer, 1, 1, 1, 1);
 		SDL_assert(set_color_ok);
@@ -126,6 +134,7 @@ SDL_AppResult SDL_AppIterate(void* appstate) {
 	ImGui::DockSpaceOverViewport(0, nullptr, ImGuiDockNodeFlags_PassthruCentralNode);
 
 	ImGui::ShowDemoWindow();
+	app->session->update();
 
 	const bool set_color_ok = SDL_SetRenderDrawColorFloat(app->renderer, 0, 0, 0, 1);
 	SDL_assert(set_color_ok);
