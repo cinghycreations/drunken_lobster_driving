@@ -12,6 +12,7 @@
 #include <imgui_impl_sdl3.h>
 #include <imgui_impl_sdlrenderer3.h>
 #include <memory>
+#include <nlohmann/json.hpp>
 #include <numbers>
 #include <string_view>
 
@@ -27,6 +28,78 @@ public:
 	SDL_IOStream* open(const std::filesystem::path& path) const {
 		return SDL_IOFromFile(path.string().c_str(), "rb");
 	}
+
+	nlohmann::json loadJson(const std::filesystem::path& path) const {
+		SDL_IOStream* stream = open(path);
+		size_t data_size = 0;
+		void* data = SDL_LoadFile_IO(stream, &data_size, true);
+		SDL_assert(data);
+
+		nlohmann::json json = nlohmann::json::parse(static_cast<char*>(data), static_cast<char*>(data) + data_size);
+		return json;
+	}
+
+	void saveJson(const std::filesystem::path& path, const nlohmann::json& json) const {
+		SDL_IOStream* stream = SDL_IOFromFile(path.string().c_str(), "wb");
+		SDL_assert(stream);
+
+		const std::string data = json.dump(1, '\t');
+
+		const bool save_ok = SDL_SaveFile_IO(stream, data.data(), data.size(), true);
+		SDL_assert(save_ok);
+	}
+};
+
+struct CameraSettings {
+	float zoom = 1;
+
+	NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(CameraSettings, zoom);
+};
+
+struct CarSettings {
+	float size = 0.2f;
+	float speed = 0.1f;
+	float mouseSensibility = 0.01f;
+	float steerSpeed = 1;
+	float steerSkidAngle = 1;
+
+	NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(CarSettings, size, speed, mouseSensibility, steerSpeed, steerSkidAngle);
+};
+
+struct Settings {
+	CameraSettings camera;
+	CarSettings car;
+
+	void update(const Storage& storage) {
+		if (ImGui::Begin("Settings")) {
+			ImGui::SetNextItemShortcut(ImGuiMod_Ctrl | ImGuiKey_R);
+			if (ImGui::Button("Reload") && storage.exists("settings.json")) {
+				const nlohmann::json json = storage.loadJson("settings.json");
+				*this = json;
+			}
+			ImGui::SameLine();
+			ImGui::SetNextItemShortcut(ImGuiMod_Ctrl | ImGuiKey_S);
+			if (ImGui::Button("Save")) {
+				const nlohmann::json json = *this;
+				storage.saveJson("settings.json", json);
+			}
+
+			if (ImGui::CollapsingHeader("Camera", ImGuiTreeNodeFlags_DefaultOpen)) {
+				ImGui::DragFloat("Zoom", &camera.zoom, 0.01f, 0.01f, 10);
+			}
+
+			if (ImGui::CollapsingHeader("Car", ImGuiTreeNodeFlags_DefaultOpen)) {
+				ImGui::DragFloat("Size", &car.size, 0.01f, 0.01f, 5);
+				ImGui::DragFloat("Speed", &car.speed, 0.01f);
+				ImGui::DragFloat("Mouse Sensibility", &car.mouseSensibility, 0.01f);
+				ImGui::SliderAngle("Steer Speed", &car.steerSpeed, -360, 360, "%.0f deg/s");
+				ImGui::SliderAngle("Steer Skid Angle", &car.steerSkidAngle);
+			}
+		}
+		ImGui::End();
+	}
+
+	NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(Settings, camera, car);
 };
 
 struct Flipbook {
@@ -74,25 +147,21 @@ struct Content {
 };
 
 struct Session {
+	const Settings& settings;
 	Content& content;
 	SDL_Renderer* renderer;
 	int2 worldSize = {5, 5};
 	float2 cameraPosition = {0, 0};
-	float cameraZoom = 1;
+
 	bool cameraFollowCar = true;
 
-	float carSize = 0.2f;
-	float carSpeed = 0.1f;
-	float carMouseSensibility = 0.01f;
-	float carSteerSpeed = 1;
-	float carSteerSkidAngle = 1;
 	bool carPaused = false;
 	float2 carPosition = {0.5f, 0.5f};
 	float2 carForwardDirection = {1, 0};
 	float2 carSteerDirection = {1, 0};
 	bool carSkid = false;
 
-	Session(Content& _content, SDL_Renderer* _renderer) : content(_content), renderer(_renderer) {}
+	Session(const Settings& _settings, Content& _content, SDL_Renderer* _renderer) : settings(_settings), content(_content), renderer(_renderer) {}
 
 	float2 getRenderTileSize() const {
 		int render_width = 0, render_height = 0;
@@ -100,7 +169,7 @@ struct Session {
 		SDL_assert(output_size_ok);
 
 		const float2 render_size(render_width, render_height);
-		const float2 tile_size = float2(render_size.y * 0.5f * 2, render_size.y * 0.5f) * cameraZoom;
+		const float2 tile_size = float2(render_size.y * 0.5f * 2, render_size.y * 0.5f) * settings.camera.zoom;
 		return tile_size;
 	}
 
@@ -129,41 +198,37 @@ struct Session {
 		//---------- Debug Ui ----------//
 
 		if (ImGui::Begin("Session")) {
-			ImGui::Text("Camera");
-			ImGui::SetNextItemShortcut(ImGuiMod_Ctrl | ImGuiKey_F);
-			ImGui::Checkbox("Follow Car", &cameraFollowCar);
-			ImGui::BeginDisabled(cameraFollowCar);
-			ImGui::DragFloat2("Position##Camera", &cameraPosition.x, 0.01f);
-			ImGui::EndDisabled();
-			ImGui::DragFloat("Zoom", &cameraZoom, 0.01f, 0.01f, 10);
-			ImGui::Separator();
+			if (ImGui::CollapsingHeader("Camera", ImGuiTreeNodeFlags_DefaultOpen)) {
+				ImGui::SetNextItemShortcut(ImGuiMod_Ctrl | ImGuiKey_F);
+				ImGui::Checkbox("Follow Car", &cameraFollowCar);
+				ImGui::BeginDisabled(cameraFollowCar);
+				ImGui::DragFloat2("Position##Camera", &cameraPosition.x, 0.01f);
+				ImGui::EndDisabled();
+			}
 
-			ImGui::Text("Car");
-			ImGui::SetNextItemShortcut(ImGuiMod_Ctrl | ImGuiKey_R);
-			if (ImGui::Button("Return Home")) {
-				carPosition = {0.5f, 0.5f};
-				carForwardDirection = {1, 0};
-				carSteerDirection = {1, 0};
-				carSkid = false;
+			if (ImGui::CollapsingHeader("Car", ImGuiTreeNodeFlags_DefaultOpen)) {
+				ImGui::SetNextItemShortcut(ImGuiMod_Ctrl | ImGuiKey_H);
+				if (ImGui::Button("Return Home")) {
+					carPosition = {0.5f, 0.5f};
+					carForwardDirection = {1, 0};
+					carSteerDirection = {1, 0};
+					carSkid = false;
+				}
+				ImGui::SameLine();
+				ImGui::SetNextItemShortcut(ImGuiMod_Ctrl | ImGuiKey_D);
+				if (ImGui::Button("Debug Simulation")) {
+					debug_simulation = true;
+				}
+				ImGui::SetNextItemShortcut(ImGuiMod_Ctrl | ImGuiKey_P);
+				ImGui::Checkbox("Pause", &carPaused);
+
+				ImGui::BeginDisabled(!(carPaused));
+				ImGui::DragFloat2("Position##Car", &carPosition.x, 0.01f);
+				ImGui::DragFloat2("Forward", &carForwardDirection.x, 0.01f);
+				ImGui::DragFloat2("Steer", &carSteerDirection.x, 0.01f);
+				ImGui::Checkbox("Skid", &carSkid);
+				ImGui::EndDisabled();
 			}
-			ImGui::SameLine();
-			ImGui::SetNextItemShortcut(ImGuiMod_Ctrl | ImGuiKey_D);
-			if (ImGui::Button("Debug Simulation")) {
-				debug_simulation = true;
-			}
-			ImGui::SetNextItemShortcut(ImGuiMod_Ctrl | ImGuiKey_P);
-			ImGui::Checkbox("Pause", &carPaused);
-			ImGui::DragFloat("Size", &carSize, 0.01f, 0.01f, 5);
-			ImGui::DragFloat("Speed", &carSpeed, 0.01f);
-			ImGui::DragFloat("Mouse Sensibility", &carMouseSensibility, 0.01f);
-			ImGui::SliderAngle("Steer Speed", &carSteerSpeed, -360, 360, "%.0f deg/s");
-			ImGui::SliderAngle("Steer Skid Angle", &carSteerSkidAngle);
-			ImGui::BeginDisabled(!(carPaused));
-			ImGui::DragFloat2("Position##Car", &carPosition.x, 0.01f);
-			ImGui::DragFloat2("Forward", &carForwardDirection.x, 0.01f);
-			ImGui::DragFloat2("Steer", &carSteerDirection.x, 0.01f);
-			ImGui::Checkbox("Skid", &carSkid);
-			ImGui::EndDisabled();
 		}
 		ImGui::End();
 
@@ -177,15 +242,15 @@ struct Session {
 			float mouse_delta_x;
 			SDL_GetRelativeMouseState(&mouse_delta_x, nullptr);
 
-			const float steer_angle = mouse_delta_x * carMouseSensibility;
+			const float steer_angle = mouse_delta_x * settings.car.mouseSensibility;
 			carSteerDirection = glm::rotate(glm::normalize(carSteerDirection), steer_angle);
 
 			const float delta_secs = float(delta_time.count()) / 1000000;
 			const float wanted_angle = glm::orientedAngle(carForwardDirection, carSteerDirection);
-			const float max_angle = carSteerSkidAngle * delta_secs;
+			const float max_angle = settings.car.steerSkidAngle * delta_secs;
 			carSkid = std::fabs(wanted_angle) >= max_angle;
 			carForwardDirection = glm::rotate(carForwardDirection, std::clamp(wanted_angle, -max_angle, max_angle));
-			carPosition += carForwardDirection * carSpeed * delta_secs;
+			carPosition += carForwardDirection * settings.car.speed * delta_secs;
 		}
 
 		if (cameraFollowCar) {
@@ -230,7 +295,7 @@ struct Session {
 			const float pi2 = std::numbers::pi * 2;
 			const float rotation = car_rotation > 0 ? car_rotation : pi2 - std::fmod(-car_rotation, pi2);
 			const int frame = int(rotation / pi2 * content.carFlipbook.textures.size()) % content.carFlipbook.textures.size();
-			renderEntity(carPosition, carSize, content.carFlipbook.textures.at(frame), renderer);
+			renderEntity(carPosition, settings.car.size, content.carFlipbook.textures.at(frame), renderer);
 		}
 	}
 };
@@ -239,6 +304,7 @@ struct App {
 	SDL_Window* window = nullptr;
 	SDL_Renderer* renderer = nullptr;
 	std::unique_ptr<Storage> storage;
+	Settings settings;
 	std::unique_ptr<Content> content;
 	std::unique_ptr<Session> session;
 	bool showDebugUi = false;
@@ -281,8 +347,14 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[]) {
 	}
 
 	app->storage.reset(new Storage);
+
+	if (app->storage->exists("settings.json")) {
+		const nlohmann::json json = app->storage->loadJson("settings.json");
+		app->settings = json;
+	}
+
 	app->content.reset(new Content(*app->storage, app->renderer));
-	app->session.reset(new Session(*app->content, app->renderer));
+	app->session.reset(new Session(app->settings, *app->content, app->renderer));
 	app->currentTime = std::chrono::microseconds(SDL_GetTicksNS() / 1000);
 
 	*appstate = app;
@@ -320,6 +392,7 @@ SDL_AppResult SDL_AppIterate(void* appstate) {
 	ImGui::NewFrame();
 	ImGui::DockSpaceOverViewport(0, nullptr, ImGuiDockNodeFlags_PassthruCentralNode);
 
+	app->settings.update(*app->storage);
 	app->session->update(app->deltaTime);
 
 	const bool set_color_ok = SDL_SetRenderDrawColorFloat(app->renderer, 0, 0, 0, 1);
