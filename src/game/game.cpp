@@ -157,6 +157,23 @@ struct Content {
 };
 
 struct Session {
+
+	enum class CellType {
+		Road,
+		Garden,
+		House,
+		GasPump,
+		Skyscraper,
+		Nuclear,
+	};
+
+	struct CellState {
+		CellType type;
+		uint32_t roadTile;
+		bool destructed;
+		std::chrono::microseconds destructionTime;
+	};
+
 	const Settings& settings;
 	const Content& content;
 	SDL_Window* window;
@@ -175,6 +192,7 @@ struct Session {
 	bool carSkid = false;
 
 	std::unique_ptr<tson::Map> level;
+	std::vector<CellState> cells;
 
 	Session(const Settings& _settings, const Content& _content, SDL_Window* _window, SDL_Renderer* _renderer, const std::filesystem::path& level_path)
 		: settings(_settings), content(_content), window(_window), renderer(_renderer) {
@@ -188,6 +206,46 @@ struct Session {
 		SDL_assert(level->getTileset("roads"));
 
 		worldSize = int2(level->getSize().x, level->getSize().y);
+		cells.resize(worldSize.x * worldSize.y);
+
+		{
+			const tson::Tileset* buildings_tileset = level->getTileset("buildings");
+			const tson::Tileset* roads_tileset = level->getTileset("roads");
+			const auto& tile_data = level->getLayers().front().getTileData();
+
+			for (int i = 0; i < worldSize.y; ++i) {
+				for (int j = 0; j < worldSize.y; ++j) {
+					SDL_assert(tile_data.count({j, i}));
+					const tson::Tile* tile = tile_data.at({j, i});
+					SDL_assert(tile->getTileset() == buildings_tileset || tile->getTileset() == roads_tileset);
+
+					CellState& cell = cells.at(i * worldSize.x + j);
+
+					if (tile->getTileset() == roads_tileset) {
+						cell.type = CellType::Road;
+						cell.roadTile = tile->getId() - 1;
+					} else if (tile->getTileset() == buildings_tileset) {
+						const uint32_t id = tile->getId() - 1;
+						SDL_assert(id <= 4);
+
+						if (id == 0) {
+							cell.type = CellType::GasPump;
+						} else if (id == 1) {
+							cell.type = CellType::House;
+						} else if (id == 2) {
+							cell.type = CellType::Nuclear;
+						} else if (id == 3) {
+							cell.type = CellType::Skyscraper;
+						} else if (id == 4) {
+							cell.type = CellType::Garden;
+						}
+					}
+
+					cell.destructed = false;
+					cell.destructionTime = std::chrono::microseconds(0);
+				}
+			}
+		}
 	}
 
 	float2 getRenderTileSize() const {
@@ -219,7 +277,7 @@ struct Session {
 		return render_pos;
 	}
 
-	void update(const std::chrono::microseconds delta_time) {
+	void update(const std::chrono::microseconds game_time, const std::chrono::microseconds delta_time) {
 		bool debug_simulation = false;
 
 		//---------- Debug Ui ----------//
@@ -310,10 +368,9 @@ struct Session {
 			return true;
 		}
 
-		const tson::Tileset* buildings_tileset = level->getTileset("buildings");
-		const auto& tile_data = level->getLayers().front().getTileData();
-
-		if (tile_data.count({coords.x, coords.y}) && tile_data.at({coords.x, coords.y})->getTileset() == buildings_tileset) {
+		const CellState& cell = cells.at(coords.y * worldSize.x + coords.x);
+		if (cell.type == CellType::Garden || cell.type == CellType::House || cell.type == CellType::GasPump || cell.type == CellType::Skyscraper ||
+			cell.type == CellType::Nuclear) {
 			return true;
 		}
 
@@ -387,43 +444,27 @@ struct Session {
 	}
 
 	void renderLevel() {
-		const tson::Tileset* buildings_tileset = level->getTileset("buildings");
-		const tson::Tileset* roads_tileset = level->getTileset("roads");
-		const tson::Layer& layer = level->getLayers().front();
-		const auto& tile_data = layer.getTileData();
+		for (int i = 0; i < worldSize.y; ++i) {
+			for (int j = 0; j < worldSize.y; ++j) {
+				const CellState& cell = cells.at(i * worldSize.x + j);
+				SDL_Texture* texture = nullptr;
 
-		tson::Tile* tile;
-		for (int i = 0; i <= worldSize.y; ++i) {
-			for (int j = 0; j <= worldSize.y; ++j) {
-				if (!tile_data.count({j, i})) {
-					continue;
+				if (cell.type == CellType::Road) {
+					texture = content.roadsFlipbook.textures.at(cell.roadTile);
+					renderEntity(float2(j, i) + float2(0.5f), 1, texture, renderer);
+				} else if (cell.type == CellType::Garden) {
+					texture = content.gardenFlipbook.textures.front();
+				} else if (cell.type == CellType::House) {
+					texture = content.houseFlipbook.textures.front();
+				} else if (cell.type == CellType::GasPump) {
+					texture = content.gaspumpFlipbook.textures.front();
+				} else if (cell.type == CellType::Nuclear) {
+					texture = content.nuclearFlipbook.textures.front();
+				} else if (cell.type == CellType::Skyscraper) {
+					texture = content.skyscraperFlipbook.textures.front();
 				}
 
-				const tson::Tile* tile = tile_data.at({j, i});
-				SDL_assert(tile->getTileset() == buildings_tileset || tile->getTileset() == roads_tileset);
-
-				if (tile->getTileset() == roads_tileset) {
-					const uint32_t id = tile->getId() - 1;
-					SDL_assert(id < content.roadsFlipbook.textures.size());
-					SDL_Texture* texture = content.roadsFlipbook.textures.at(id);
-					renderEntity(float2(j, i) + float2(0.5f), 1, texture, renderer);
-				} else if (tile->getTileset() == buildings_tileset) {
-					const uint32_t id = tile->getId() - 1;
-					SDL_assert(id <= 4);
-					SDL_Texture* texture = nullptr;
-					if (id == 0) {
-						texture = content.gaspumpFlipbook.textures.front();
-					} else if (id == 1) {
-						texture = content.houseFlipbook.textures.front();
-					} else if (id == 2) {
-						texture = content.nuclearFlipbook.textures.front();
-					} else if (id == 3) {
-						texture = content.skyscraperFlipbook.textures.front();
-					} else if (id == 4) {
-						texture = content.gardenFlipbook.textures.front();
-					}
-					renderEntity(float2(j, i) + float2(0.5f), 1, texture, renderer);
-				}
+				renderEntity(float2(j, i) + float2(0.5f), 1, texture, renderer);
 			}
 		}
 	}
@@ -549,7 +590,7 @@ SDL_AppResult SDL_AppIterate(void* appstate) {
 	ImGui::DockSpaceOverViewport(0, nullptr, ImGuiDockNodeFlags_PassthruCentralNode);
 
 	app->settings.update(*app->storage);
-	app->session->update(app->deltaTime);
+	app->session->update(app->currentTime, app->deltaTime);
 
 	const bool set_color_ok = SDL_SetRenderDrawColorFloat(app->renderer, 0, 0, 0, 1);
 	SDL_assert(set_color_ok);
