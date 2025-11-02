@@ -5,6 +5,7 @@
 #include <SDL3_image/SDL_image.h>
 #include <filesystem>
 #include <fmt/format.h>
+#include <glm/geometric.hpp>
 #include <glm/glm.hpp>
 #include <glm/gtx/rotate_vector.hpp>
 #include <glm/gtx/vector_angle.hpp>
@@ -155,6 +156,7 @@ struct Session {
 	bool inputCaptureMouse = false;
 
 	bool carPaused = false;
+	float2 carPrevPosition = {0.5f, 0.5f};
 	float2 carPosition = {0.5f, 0.5f};
 	float2 carForwardDirection = {1, 0};
 	float2 carSteerDirection = {1, 0};
@@ -247,22 +249,81 @@ struct Session {
 				__debugbreak();
 			}
 
-			float mouse_delta_x;
-			SDL_GetRelativeMouseState(&mouse_delta_x, nullptr);
-
-			const float steer_angle = mouse_delta_x * settings.car.mouseSensibility;
-			carSteerDirection = glm::rotate(glm::normalize(carSteerDirection), steer_angle);
-
-			const float delta_secs = float(delta_time.count()) / 1000000;
-			const float wanted_angle = glm::orientedAngle(carForwardDirection, carSteerDirection);
-			const float max_angle = glm::radians(settings.car.grip * 360) * delta_secs;
-			carSkid = std::fabs(wanted_angle) >= max_angle;
-			carForwardDirection = glm::rotate(carForwardDirection, std::clamp(wanted_angle, -max_angle, max_angle));
-			carPosition += carForwardDirection * settings.car.speed * delta_secs;
+			updateCarDrive(delta_time);
+			updateCarCollisions();
 		}
 
 		if (cameraFollowCar) {
 			cameraPosition = carPosition;
+		}
+	}
+
+	void updateCarDrive(const std::chrono::microseconds delta_time) {
+		carPrevPosition = carPosition;
+
+		float mouse_delta_x;
+		SDL_GetRelativeMouseState(&mouse_delta_x, nullptr);
+
+		const float steer_angle = mouse_delta_x * settings.car.mouseSensibility;
+		carSteerDirection = glm::rotate(glm::normalize(carSteerDirection), steer_angle);
+
+		const float delta_secs = float(delta_time.count()) / 1000000;
+		const float wanted_angle = glm::orientedAngle(carForwardDirection, carSteerDirection);
+		const float max_angle = glm::radians(settings.car.grip * 360) * delta_secs;
+		carSkid = std::fabs(wanted_angle) >= max_angle;
+		carForwardDirection = glm::rotate(carForwardDirection, std::clamp(wanted_angle, -max_angle, max_angle));
+		carPosition += carForwardDirection * settings.car.speed * delta_secs;
+	}
+
+	bool isTileSolid(const int2& coords) {
+		return coords.x < 0 || coords.x >= worldSize.x || coords.y < 0 || coords.y >= worldSize.y;
+	}
+
+	void updateCarCollisions() {
+		const float2 delta = carPosition - carPrevPosition;
+		int2 prev_tile = glm::floor(carPrevPosition);
+		int2 curr_tile = glm::floor(carPosition);
+
+		if (prev_tile == curr_tile) {
+			return;
+		}
+
+		if (curr_tile == prev_tile + int2(-1, -1)) {
+			curr_tile = prev_tile + (delta.x > delta.y ? int2(-1, 0) : int2(0, -1));
+		}
+
+		if (curr_tile == prev_tile + int2(-1, 1)) {
+			curr_tile = prev_tile + (delta.x > delta.y ? int2(-1, 0) : int2(0, 1));
+		}
+
+		if (curr_tile == prev_tile + int2(1, -1)) {
+			curr_tile = prev_tile + (delta.x > delta.y ? int2(1, 0) : int2(0, -1));
+		}
+
+		if (curr_tile == prev_tile + int2(1, 1)) {
+			curr_tile = prev_tile + (delta.x > delta.y ? int2(-1, 0) : int2(0, 1));
+		}
+
+		if (isTileSolid(curr_tile)) {
+			if (curr_tile == prev_tile + int2(1, 0)) {
+				carPosition = float2(curr_tile.x, carPosition.y);
+				carForwardDirection = glm::reflect(carForwardDirection, float2(-1, 0));
+			}
+
+			if (curr_tile == prev_tile + int2(-1, 0)) {
+				carPosition = float2(prev_tile.x, carPosition.y);
+				carForwardDirection = glm::reflect(carForwardDirection, float2(1, 0));
+			}
+
+			if (curr_tile == prev_tile + int2(0, -1)) {
+				carPosition = float2(carPosition.x, prev_tile.y);
+				carForwardDirection = glm::reflect(carForwardDirection, float2(0, 1));
+			}
+
+			if (curr_tile == prev_tile + int2(0, 1)) {
+				carPosition = float2(carPosition.x, curr_tile.y);
+				carForwardDirection = glm::reflect(carForwardDirection, float2(0, -1));
+			}
 		}
 	}
 
