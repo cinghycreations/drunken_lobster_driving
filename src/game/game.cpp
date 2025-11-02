@@ -162,6 +162,7 @@ struct Session {
 	SDL_Window* window;
 	SDL_Renderer* renderer;
 	int2 worldSize;
+	bool renderEnableGrid = false;
 	float2 cameraPosition = {0, 0};
 	bool cameraFollowCar = true;
 	bool inputCaptureMouse = false;
@@ -224,6 +225,11 @@ struct Session {
 		//---------- Debug Ui ----------//
 
 		if (ImGui::Begin("Session")) {
+			if (ImGui::CollapsingHeader("Render", ImGuiTreeNodeFlags_DefaultOpen)) {
+				ImGui::SetNextItemShortcut(ImGuiMod_Ctrl | ImGuiKey_G);
+				ImGui::Checkbox("Grid", &renderEnableGrid);
+			}
+
 			if (ImGui::CollapsingHeader("Camera", ImGuiTreeNodeFlags_DefaultOpen)) {
 				ImGui::SetNextItemShortcut(ImGuiMod_Ctrl | ImGuiKey_F);
 				ImGui::Checkbox("Follow Car", &cameraFollowCar);
@@ -374,8 +380,10 @@ struct Session {
 
 	void render() {
 		renderLevel();
-		renderGrid();
 		renderCar();
+		if (renderEnableGrid) {
+			renderGrid();
+		}
 	}
 
 	void renderLevel() {
