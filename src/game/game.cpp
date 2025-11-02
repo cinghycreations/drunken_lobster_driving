@@ -16,6 +16,7 @@
 #include <nlohmann/json.hpp>
 #include <numbers>
 #include <string_view>
+#include <tileson.hpp>
 
 using float2 = glm::vec2;
 using int2 = glm::ivec2;
@@ -139,18 +140,28 @@ struct Flipbook {
 };
 
 struct Content {
+	Storage& storage;
 	Flipbook carFlipbook;
 	Flipbook roadsFlipbook;
+	Flipbook gardenFlipbook;
+	Flipbook gaspumpFlipbook;
+	Flipbook houseFlipbook;
+	Flipbook nuclearFlipbook;
+	Flipbook skyscraperFlipbook;
 
-	Content(Storage& storage, SDL_Renderer* renderer) : carFlipbook(storage, renderer, "car/car{:04}.png", 1), roadsFlipbook(storage, renderer, "roads/road{:04}.png", 1) {}
+	Content(Storage& _storage, SDL_Renderer* renderer)
+		: storage(_storage), carFlipbook(storage, renderer, "car/car{:04}.png", 1), roadsFlipbook(storage, renderer, "roads/road{:04}.png", 1),
+		  gardenFlipbook(storage, renderer, "buildings/garden{:04}.png", 0), gaspumpFlipbook(storage, renderer, "buildings/gaspump{:04}.png", 0),
+		  houseFlipbook(storage, renderer, "buildings/house{:04}.png", 0), nuclearFlipbook(storage, renderer, "buildings/nuclear{:04}.png", 0),
+		  skyscraperFlipbook(storage, renderer, "buildings/skyscraper{:04}.png", 0) {}
 };
 
 struct Session {
 	const Settings& settings;
-	Content& content;
+	const Content& content;
 	SDL_Window* window;
 	SDL_Renderer* renderer;
-	int2 worldSize = {5, 5};
+	int2 worldSize;
 	float2 cameraPosition = {0, 0};
 	bool cameraFollowCar = true;
 	bool inputCaptureMouse = false;
@@ -162,8 +173,21 @@ struct Session {
 	float2 carSteerDirection = {1, 0};
 	bool carSkid = false;
 
-	Session(const Settings& _settings, Content& _content, SDL_Window* _window, SDL_Renderer* _renderer)
-		: settings(_settings), content(_content), window(_window), renderer(_renderer) {}
+	std::unique_ptr<tson::Map> level;
+
+	Session(const Settings& _settings, const Content& _content, SDL_Window* _window, SDL_Renderer* _renderer, const std::filesystem::path& level_path)
+		: settings(_settings), content(_content), window(_window), renderer(_renderer) {
+
+		tson::Tileson parser(std::unique_ptr<tson::NlohmannJson>(new tson::NlohmannJson));
+		level = parser.parse(level_path);
+		SDL_assert(level->getStatus() == tson::ParseStatus::OK);
+		SDL_assert(level->getLayers().size() == 1);
+		SDL_assert(level->getLayers().front().getType() == tson::LayerType::TileLayer);
+		SDL_assert(level->getTileset("buildings"));
+		SDL_assert(level->getTileset("roads"));
+
+		worldSize = int2(level->getSize().x, level->getSize().y);
+	}
 
 	float2 getRenderTileSize() const {
 		int render_width = 0, render_height = 0;
@@ -276,7 +300,18 @@ struct Session {
 	}
 
 	bool isTileSolid(const int2& coords) {
-		return coords.x < 0 || coords.x >= worldSize.x || coords.y < 0 || coords.y >= worldSize.y;
+		if (coords.x < 0 || coords.x >= worldSize.x || coords.y < 0 || coords.y >= worldSize.y) {
+			return true;
+		}
+
+		const tson::Tileset* buildings_tileset = level->getTileset("buildings");
+		const auto& tile_data = level->getLayers().front().getTileData();
+
+		if (tile_data.count({coords.x, coords.y}) && tile_data.at({coords.x, coords.y})->getTileset() == buildings_tileset) {
+			return true;
+		}
+
+		return false;
 	}
 
 	void updateCarCollisions() {
@@ -338,34 +373,78 @@ struct Session {
 	}
 
 	void render() {
-		//---------- Grid ----------//
-		{
-			const bool set_color_ok = SDL_SetRenderDrawColorFloat(renderer, 1, 1, 1, 1);
-			SDL_assert(set_color_ok);
+		renderLevel();
+		renderGrid();
+		renderCar();
+	}
 
-			for (int i = 0; i <= worldSize.y; ++i) {
-				const float2 a = worldToRender(float2(0, i));
-				const float2 b = worldToRender(float2(worldSize.x, i));
-				const bool render_line_ok = SDL_RenderLine(renderer, a.x, a.y, b.x, b.y);
-				SDL_assert(render_line_ok);
-			}
+	void renderLevel() {
+		const tson::Tileset* buildings_tileset = level->getTileset("buildings");
+		const tson::Tileset* roads_tileset = level->getTileset("roads");
+		const tson::Layer& layer = level->getLayers().front();
+		const auto& tile_data = layer.getTileData();
 
+		tson::Tile* tile;
+		for (int i = 0; i <= worldSize.y; ++i) {
 			for (int j = 0; j <= worldSize.y; ++j) {
-				const float2 a = worldToRender(float2(j, 0));
-				const float2 b = worldToRender(float2(j, worldSize.y));
-				const bool render_line_ok = SDL_RenderLine(renderer, a.x, a.y, b.x, b.y);
-				SDL_assert(render_line_ok);
+				if (!tile_data.count({j, i})) {
+					continue;
+				}
+
+				const tson::Tile* tile = tile_data.at({j, i});
+				SDL_assert(tile->getTileset() == buildings_tileset || tile->getTileset() == roads_tileset);
+
+				if (tile->getTileset() == roads_tileset) {
+					const uint32_t id = tile->getId() - 1;
+					SDL_assert(id < content.roadsFlipbook.textures.size());
+					SDL_Texture* texture = content.roadsFlipbook.textures.at(id);
+					renderEntity(float2(j, i) + float2(0.5f), 1, texture, renderer);
+				} else if (tile->getTileset() == buildings_tileset) {
+					const uint32_t id = tile->getId() - 1;
+					SDL_assert(id <= 4);
+					SDL_Texture* texture = nullptr;
+					if (id == 0) {
+						texture = content.gaspumpFlipbook.textures.front();
+					} else if (id == 1) {
+						texture = content.houseFlipbook.textures.front();
+					} else if (id == 2) {
+						texture = content.nuclearFlipbook.textures.front();
+					} else if (id == 3) {
+						texture = content.skyscraperFlipbook.textures.front();
+					} else if (id == 4) {
+						texture = content.gardenFlipbook.textures.front();
+					}
+					renderEntity(float2(j, i) + float2(0.5f), 1, texture, renderer);
+				}
 			}
 		}
+	}
 
-		//---------- Car ----------//
-		{
-			const float car_rotation = glm::orientedAngle(carSteerDirection, float2(1, 0));
-			const float pi2 = std::numbers::pi * 2;
-			const float rotation = car_rotation > 0 ? car_rotation : pi2 - std::fmod(-car_rotation, pi2);
-			const int frame = int(rotation / pi2 * content.carFlipbook.textures.size()) % content.carFlipbook.textures.size();
-			renderEntity(carPosition, settings.car.size, content.carFlipbook.textures.at(frame), renderer);
+	void renderGrid() {
+		const bool set_color_ok = SDL_SetRenderDrawColorFloat(renderer, 1, 1, 1, 1);
+		SDL_assert(set_color_ok);
+
+		for (int i = 0; i <= worldSize.y; ++i) {
+			const float2 a = worldToRender(float2(0, i));
+			const float2 b = worldToRender(float2(worldSize.x, i));
+			const bool render_line_ok = SDL_RenderLine(renderer, a.x, a.y, b.x, b.y);
+			SDL_assert(render_line_ok);
 		}
+
+		for (int j = 0; j <= worldSize.y; ++j) {
+			const float2 a = worldToRender(float2(j, 0));
+			const float2 b = worldToRender(float2(j, worldSize.y));
+			const bool render_line_ok = SDL_RenderLine(renderer, a.x, a.y, b.x, b.y);
+			SDL_assert(render_line_ok);
+		}
+	}
+
+	void renderCar() {
+		const float car_rotation = glm::orientedAngle(carSteerDirection, float2(1, 0));
+		const float pi2 = std::numbers::pi * 2;
+		const float rotation = car_rotation > 0 ? car_rotation : pi2 - std::fmod(-car_rotation, pi2);
+		const int frame = int(rotation / pi2 * content.carFlipbook.textures.size()) % content.carFlipbook.textures.size();
+		renderEntity(carPosition, settings.car.size, content.carFlipbook.textures.at(frame), renderer);
 	}
 };
 
@@ -423,7 +502,7 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[]) {
 	}
 
 	app->content.reset(new Content(*app->storage, app->renderer));
-	app->session.reset(new Session(app->settings, *app->content, app->window, app->renderer));
+	app->session.reset(new Session(app->settings, *app->content, app->window, app->renderer, "levels/testbed.tmj"));
 	app->currentTime = std::chrono::microseconds(SDL_GetTicksNS() / 1000);
 
 	*appstate = app;
