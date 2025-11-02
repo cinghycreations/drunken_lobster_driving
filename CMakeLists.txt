@@ -55,5 +55,5 @@ target_link_libraries( ImGuiBackend PUBLIC ImGui SDL3-static )
 
 add_executable( game src/game/game.cpp )
 target_include_directories( game PUBLIC src/game )
-target_compile_definitions( game PUBLIC SDL_ASSERT_LEVEL=2 )
+target_compile_definitions( game PUBLIC GLM_ENABLE_EXPERIMENTAL SDL_ASSERT_LEVEL=2 )
 target_link_libraries( game PUBLIC SDL_uclibc SDL3-static SDL3_image-static fmt glm nlohmann_json ImGui ImGuiBackend )
