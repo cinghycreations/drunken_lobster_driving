@@ -147,11 +147,12 @@ struct Content {
 struct Session {
 	const Settings& settings;
 	Content& content;
+	SDL_Window* window;
 	SDL_Renderer* renderer;
 	int2 worldSize = {5, 5};
 	float2 cameraPosition = {0, 0};
-
 	bool cameraFollowCar = true;
+	bool inputCaptureMouse = false;
 
 	bool carPaused = false;
 	float2 carPosition = {0.5f, 0.5f};
@@ -159,7 +160,8 @@ struct Session {
 	float2 carSteerDirection = {1, 0};
 	bool carSkid = false;
 
-	Session(const Settings& _settings, Content& _content, SDL_Renderer* _renderer) : settings(_settings), content(_content), renderer(_renderer) {}
+	Session(const Settings& _settings, Content& _content, SDL_Window* _window, SDL_Renderer* _renderer)
+		: settings(_settings), content(_content), window(_window), renderer(_renderer) {}
 
 	float2 getRenderTileSize() const {
 		int render_width = 0, render_height = 0;
@@ -202,6 +204,14 @@ struct Session {
 				ImGui::BeginDisabled(cameraFollowCar);
 				ImGui::DragFloat2("Position##Camera", &cameraPosition.x, 0.01f);
 				ImGui::EndDisabled();
+			}
+
+			if (ImGui::CollapsingHeader("Input", ImGuiTreeNodeFlags_DefaultOpen)) {
+				ImGui::SetNextItemShortcut(ImGuiMod_Ctrl | ImGuiKey_M);
+				if (ImGui::Checkbox("Capture Mouse", &inputCaptureMouse)) {
+					const bool mouse_mode_ok = SDL_SetWindowRelativeMouseMode(window, inputCaptureMouse);
+					SDL_assert(mouse_mode_ok);
+				}
 			}
 
 			if (ImGui::CollapsingHeader("Car", ImGuiTreeNodeFlags_DefaultOpen)) {
@@ -352,7 +362,7 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[]) {
 	}
 
 	app->content.reset(new Content(*app->storage, app->renderer));
-	app->session.reset(new Session(app->settings, *app->content, app->renderer));
+	app->session.reset(new Session(app->settings, *app->content, app->window, app->renderer));
 	app->currentTime = std::chrono::microseconds(SDL_GetTicksNS() / 1000);
 
 	*appstate = app;
