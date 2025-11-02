@@ -60,10 +60,9 @@ struct CarSettings {
 	float size = 0.2f;
 	float speed = 0.1f;
 	float mouseSensibility = 0.01f;
-	float steerSpeed = 1;
-	float steerSkidAngle = 1;
+	float grip = 1;
 
-	NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(CarSettings, size, speed, mouseSensibility, steerSpeed, steerSkidAngle);
+	NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(CarSettings, size, speed, mouseSensibility, grip);
 };
 
 struct Settings {
@@ -92,8 +91,7 @@ struct Settings {
 				ImGui::DragFloat("Size", &car.size, 0.01f, 0.01f, 5);
 				ImGui::DragFloat("Speed", &car.speed, 0.01f);
 				ImGui::DragFloat("Mouse Sensibility", &car.mouseSensibility, 0.01f);
-				ImGui::SliderAngle("Steer Speed", &car.steerSpeed, -360, 360, "%.0f deg/s");
-				ImGui::SliderAngle("Steer Skid Angle", &car.steerSkidAngle);
+				ImGui::SliderFloat("Grip", &car.grip, 0, 1);
 			}
 		}
 		ImGui::End();
@@ -247,7 +245,7 @@ struct Session {
 
 			const float delta_secs = float(delta_time.count()) / 1000000;
 			const float wanted_angle = glm::orientedAngle(carForwardDirection, carSteerDirection);
-			const float max_angle = settings.car.steerSkidAngle * delta_secs;
+			const float max_angle = glm::radians(settings.car.grip * 360) * delta_secs;
 			carSkid = std::fabs(wanted_angle) >= max_angle;
 			carForwardDirection = glm::rotate(carForwardDirection, std::clamp(wanted_angle, -max_angle, max_angle));
 			carPosition += carForwardDirection * settings.car.speed * delta_secs;
