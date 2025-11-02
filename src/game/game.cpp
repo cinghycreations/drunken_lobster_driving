@@ -6,6 +6,8 @@
 #include <filesystem>
 #include <fmt/format.h>
 #include <glm/glm.hpp>
+#include <glm/gtx/rotate_vector.hpp>
+#include <glm/gtx/vector_angle.hpp>
 #include <imgui.h>
 #include <imgui_impl_sdl3.h>
 #include <imgui_impl_sdlrenderer3.h>
@@ -76,29 +78,38 @@ struct Session {
 	SDL_Renderer* renderer;
 	int2 worldSize = {5, 5};
 	float2 cameraPosition = {0, 0};
-	float renderScale = 1;
-	float2 carPosition = {0.5f, 0.5f};
+	float cameraZoom = 1;
+	bool cameraFollowCar = true;
+
 	float carSize = 0.2f;
-	float carRotation = 0;
+	float carSpeed = 0.1f;
+	float carMouseSensibility = 0.01f;
+	float carSteerSpeed = 1;
+	float carSteerSkidAngle = 1;
+	bool carPaused = false;
+	float2 carPosition = {0.5f, 0.5f};
+	float2 carForwardDirection = {1, 0};
+	float2 carSteerDirection = {1, 0};
+	bool carSkid = false;
 
 	Session(Content& _content, SDL_Renderer* _renderer) : content(_content), renderer(_renderer) {}
 
-	float2 getIsoTileSize() const {
+	float2 getRenderTileSize() const {
 		int render_width = 0, render_height = 0;
 		const bool output_size_ok = SDL_GetRenderOutputSize(renderer, &render_width, &render_height);
 		SDL_assert(output_size_ok);
 
 		const float2 render_size(render_width, render_height);
-		const float2 tile_size = float2(render_size.y * 0.5f * 2, render_size.y * 0.5f) * renderScale;
+		const float2 tile_size = float2(render_size.y * 0.5f * 2, render_size.y * 0.5f) * cameraZoom;
 		return tile_size;
 	}
 
-	float2 getIsoDirectionX() const {
-		return getIsoTileSize() * 0.5f;
+	float2 getRenderDirectionX() const {
+		return getRenderTileSize() * 0.5f;
 	}
 
-	float2 getIsoDirectionY() const {
-		return getIsoTileSize() * 0.5f * float2(-1, 1);
+	float2 getRenderDirectionY() const {
+		return getRenderTileSize() * 0.5f * float2(-1, 1);
 	}
 
 	float2 worldToRender(const float2 world_coords) const {
@@ -106,27 +117,85 @@ struct Session {
 		const bool output_size_ok = SDL_GetRenderOutputSize(renderer, &render_width, &render_height);
 		SDL_assert(output_size_ok);
 
-		const float2 render_size(render_width, render_height);
-		const float2 x_dir = getIsoDirectionX();
-		const float2 y_dir = getIsoDirectionY();
-		const float2 render_pos = render_size * 0.5f + (world_coords - cameraPosition).x * x_dir + (world_coords - cameraPosition).y * y_dir;
+		const float2 x_dir = getRenderDirectionX();
+		const float2 y_dir = getRenderDirectionY();
+		const float2 render_pos = float2(render_width, render_height) * 0.5f + (world_coords - cameraPosition).x * x_dir + (world_coords - cameraPosition).y * y_dir;
 		return render_pos;
 	}
 
-	void update() {
+	void update(const std::chrono::microseconds delta_time) {
+		bool debug_simulation = false;
+
+		//---------- Debug Ui ----------//
+
 		if (ImGui::Begin("Session")) {
-			ImGui::DragFloat2("Camera Position", &cameraPosition.x, 0.01f);
-			ImGui::DragFloat("Render Scale", &renderScale, 0.01f, 0.01f, 10);
-			ImGui::DragFloat2("Car Position", &carPosition.x, 0.01f);
-			ImGui::DragFloat("Car Size", &carSize, 0.01f, 0.01f, 5);
-			ImGui::SliderAngle("Car Rotation", &carRotation);
+			ImGui::Text("Camera");
+			ImGui::SetNextItemShortcut(ImGuiMod_Ctrl | ImGuiKey_F);
+			ImGui::Checkbox("Follow Car", &cameraFollowCar);
+			ImGui::BeginDisabled(cameraFollowCar);
+			ImGui::DragFloat2("Position##Camera", &cameraPosition.x, 0.01f);
+			ImGui::EndDisabled();
+			ImGui::DragFloat("Zoom", &cameraZoom, 0.01f, 0.01f, 10);
+			ImGui::Separator();
+
+			ImGui::Text("Car");
+			ImGui::SetNextItemShortcut(ImGuiMod_Ctrl | ImGuiKey_R);
+			if (ImGui::Button("Return Home")) {
+				carPosition = {0.5f, 0.5f};
+				carForwardDirection = {1, 0};
+				carSteerDirection = {1, 0};
+				carSkid = false;
+			}
+			ImGui::SameLine();
+			ImGui::SetNextItemShortcut(ImGuiMod_Ctrl | ImGuiKey_D);
+			if (ImGui::Button("Debug Simulation")) {
+				debug_simulation = true;
+			}
+			ImGui::SetNextItemShortcut(ImGuiMod_Ctrl | ImGuiKey_P);
+			ImGui::Checkbox("Pause", &carPaused);
+			ImGui::DragFloat("Size", &carSize, 0.01f, 0.01f, 5);
+			ImGui::DragFloat("Speed", &carSpeed, 0.01f);
+			ImGui::DragFloat("Mouse Sensibility", &carMouseSensibility, 0.01f);
+			ImGui::SliderAngle("Steer Speed", &carSteerSpeed, -360, 360, "%.0f deg/s");
+			ImGui::SliderAngle("Steer Skid Angle", &carSteerSkidAngle);
+			ImGui::BeginDisabled(!(carPaused));
+			ImGui::DragFloat2("Position##Car", &carPosition.x, 0.01f);
+			ImGui::DragFloat2("Forward", &carForwardDirection.x, 0.01f);
+			ImGui::DragFloat2("Steer", &carSteerDirection.x, 0.01f);
+			ImGui::Checkbox("Skid", &carSkid);
+			ImGui::EndDisabled();
 		}
 		ImGui::End();
+
+		//---------- Car ----------//
+
+		if (!carPaused) {
+			if (debug_simulation) {
+				__debugbreak();
+			}
+
+			float mouse_delta_x;
+			SDL_GetRelativeMouseState(&mouse_delta_x, nullptr);
+
+			const float steer_angle = mouse_delta_x * carMouseSensibility;
+			carSteerDirection = glm::rotate(glm::normalize(carSteerDirection), steer_angle);
+
+			const float delta_secs = float(delta_time.count()) / 1000000;
+			const float wanted_angle = glm::orientedAngle(carForwardDirection, carSteerDirection);
+			const float max_angle = carSteerSkidAngle * delta_secs;
+			carSkid = std::fabs(wanted_angle) >= max_angle;
+			carForwardDirection = glm::rotate(carForwardDirection, std::clamp(wanted_angle, -max_angle, max_angle));
+			carPosition += carForwardDirection * carSpeed * delta_secs;
+		}
+
+		if (cameraFollowCar) {
+			cameraPosition = carPosition;
+		}
 	}
 
 	void renderEntity(const float2& world_coords, const float world_size, SDL_Texture* texture, SDL_Renderer* renderer) {
-		const float2 bottom_left = worldToRender(world_coords) + getIsoDirectionY() * world_size;
-		const float2 bottom_right = worldToRender(world_coords) + getIsoDirectionX() * world_size;
+		const float2 bottom_left = worldToRender(world_coords) + getRenderDirectionY() * world_size;
+		const float2 bottom_right = worldToRender(world_coords) + getRenderDirectionX() * world_size;
 		const float render_width = bottom_right.x - bottom_left.x;
 		const float render_height = float(texture->h) / float(texture->w) * render_width;
 		const SDL_FRect rect{.x = bottom_left.x, .y = bottom_left.y - render_height, .w = render_width, .h = render_height};
@@ -157,8 +226,9 @@ struct Session {
 
 		//---------- Car ----------//
 		{
+			const float car_rotation = glm::orientedAngle(carSteerDirection, float2(1, 0));
 			const float pi2 = std::numbers::pi * 2;
-			const float rotation = carRotation > 0 ? carRotation : pi2 - std::fmod(-carRotation, pi2);
+			const float rotation = car_rotation > 0 ? car_rotation : pi2 - std::fmod(-car_rotation, pi2);
 			const int frame = int(rotation / pi2 * content.carFlipbook.textures.size()) % content.carFlipbook.textures.size();
 			renderEntity(carPosition, carSize, content.carFlipbook.textures.at(frame), renderer);
 		}
@@ -172,6 +242,8 @@ struct App {
 	std::unique_ptr<Content> content;
 	std::unique_ptr<Session> session;
 	bool showDebugUi = false;
+	std::chrono::microseconds currentTime;
+	std::chrono::microseconds deltaTime;
 };
 
 SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[]) {
@@ -211,6 +283,7 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[]) {
 	app->storage.reset(new Storage);
 	app->content.reset(new Content(*app->storage, app->renderer));
 	app->session.reset(new Session(*app->content, app->renderer));
+	app->currentTime = std::chrono::microseconds(SDL_GetTicksNS() / 1000);
 
 	*appstate = app;
 	return SDL_APP_CONTINUE;
@@ -238,13 +311,16 @@ SDL_AppResult SDL_AppEvent(void* appstate, SDL_Event* event) {
 SDL_AppResult SDL_AppIterate(void* appstate) {
 	App* app = static_cast<App*>(appstate);
 
+	const std::chrono::microseconds now(SDL_GetTicksNS() / 1000);
+	app->deltaTime = now - app->currentTime;
+	app->currentTime = now;
+
 	ImGui_ImplSDLRenderer3_NewFrame();
 	ImGui_ImplSDL3_NewFrame();
 	ImGui::NewFrame();
 	ImGui::DockSpaceOverViewport(0, nullptr, ImGuiDockNodeFlags_PassthruCentralNode);
 
-	ImGui::ShowDemoWindow();
-	app->session->update();
+	app->session->update(app->deltaTime);
 
 	const bool set_color_ok = SDL_SetRenderDrawColorFloat(app->renderer, 0, 0, 0, 1);
 	SDL_assert(set_color_ok);
@@ -282,7 +358,7 @@ void SDL_AppQuit(void* appstate, SDL_AppResult result) {
 	SDL_DestroyWindow(app->window);
 	app->window = nullptr;
 
-	SDL_Quit();
-
 	delete app;
+
+	SDL_Quit();
 }
