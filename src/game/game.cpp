@@ -7,6 +7,7 @@
 #include <fmt/format.h>
 #include <glm/geometric.hpp>
 #include <glm/glm.hpp>
+#include <glm/gtx/compatibility.hpp>
 #include <glm/gtx/rotate_vector.hpp>
 #include <glm/gtx/vector_angle.hpp>
 #include <imgui.h>
@@ -54,8 +55,11 @@ public:
 
 struct CameraSettings {
 	float zoom = 1;
+	float shakeTime = 0.5f;
+	float shakePeriod = 0.1f;
+	float shakeStrength = 0.2f;
 
-	NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(CameraSettings, zoom);
+	NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(CameraSettings, zoom, shakeTime, shakePeriod, shakeStrength);
 };
 
 struct CarSettings {
@@ -109,6 +113,9 @@ struct Settings {
 
 			if (ImGui::CollapsingHeader("Camera", ImGuiTreeNodeFlags_DefaultOpen)) {
 				ImGui::DragFloat("Zoom", &camera.zoom, 0.01f, 0.01f, 10);
+				ImGui::DragFloat("Shake Time", &camera.shakeTime, 0.01f);
+				ImGui::DragFloat("Shake Period", &camera.shakePeriod, 0.01f);
+				ImGui::DragFloat("Shake Strength", &camera.shakeStrength, 0.01f);
 			}
 
 			if (ImGui::CollapsingHeader("Car", ImGuiTreeNodeFlags_DefaultOpen)) {
@@ -201,6 +208,43 @@ struct Content {
 		  skyscraperFlipbook(storage, renderer, "buildings/skyscraper{:04}.png", 0) {}
 };
 
+class CameraShaker {
+public:
+	CameraShaker(const Settings& _settings) : settings(_settings), maxDuration(std::chrono::microseconds::rep(1000000 * settings.camera.shakeTime)), movement(0, 0) {}
+
+	void shake() {
+		durationLeft = maxDuration;
+	}
+
+	void update(const std::chrono::microseconds& delta_time) {
+		if (durationLeft >= delta_time) {
+			durationLeft -= delta_time;
+			const float time_secs = float(durationLeft.count()) / float(1000000);
+			const float progress = float(durationLeft.count()) / float(maxDuration.count());
+			const float2 delta = shakeSinusoidal(time_secs, settings.camera.shakePeriod) * settings.camera.shakeStrength;
+			movement = glm::lerp(float2(0), delta, progress);
+		} else {
+			durationLeft = std::chrono::microseconds(0);
+			movement = float2(0, 0);
+		}
+	}
+
+	float2 getMovement() const {
+		return movement;
+	}
+
+private:
+	const Settings& settings;
+	std::chrono::microseconds maxDuration;
+	std::chrono::microseconds durationLeft;
+	float2 movement;
+
+	static float2 shakeSinusoidal(const float time, const float period) {
+		const float angle = (time / period) * std::numbers::pi * 2;
+		return float2(std::sin(angle), std::cos(angle));
+	}
+};
+
 struct Session {
 	enum class BuildingType {
 		None,
@@ -236,6 +280,7 @@ struct Session {
 	bool renderEnableGrid = false;
 	float2 cameraPosition = {0, 0};
 	bool cameraFollowCar = true;
+	CameraShaker cameraShaker;
 	bool inputCaptureMouse = false;
 
 	bool carPaused = false;
@@ -252,7 +297,7 @@ struct Session {
 	std::vector<CellState> cells;
 
 	Session(const Settings& _settings, const Content& _content, SDL_Window* _window, SDL_Renderer* _renderer, const std::filesystem::path& level_path)
-		: settings(_settings), content(_content), window(_window), renderer(_renderer) {
+		: settings(_settings), content(_content), cameraShaker(settings), window(_window), renderer(_renderer) {
 
 		tson::Tileson parser(std::unique_ptr<tson::NlohmannJson>(new tson::NlohmannJson));
 		level = parser.parse(level_path);
@@ -412,10 +457,11 @@ struct Session {
 			car_stats = updateCarPerks(delta_time);
 			updateCarDrive(delta_time, car_stats);
 			updateCarCollisions(game_time, car_stats);
+			cameraShaker.update(delta_time);
 		}
 
 		if (cameraFollowCar) {
-			cameraPosition = carPosition;
+			cameraPosition = carPosition + cameraShaker.getMovement();
 		}
 
 		//---------- End Game ----------//
@@ -531,6 +577,7 @@ struct Session {
 					carPerks.emplace_back(CarPerk{.durationLeft = std::chrono::microseconds(unsigned int(building_settings->perkDuration * 1000000)),
 												  .destructiveness = building_settings->perkDestructiveness});
 					carSuperSpeedDuration += std::chrono::microseconds(unsigned int(building_settings->superSpeedDuration * 1000000));
+					cameraShaker.shake();
 				} else {
 					bouncing = true;
 				}
