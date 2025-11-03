@@ -69,11 +69,11 @@ struct CarSettings {
 };
 
 struct BuildingSettings {
-	float minDestructivenessToDestroy;
-	float minSpeedToDestroy;
-	float perkDuration;
-	float perkDestructiveness;
-	float superSpeedDuration;
+	float minDestructivenessToDestroy = 0;
+	float minSpeedToDestroy = 0;
+	float perkDuration = 0;
+	float perkDestructiveness = 0;
+	float superSpeedDuration = 0;
 
 	NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(BuildingSettings, minDestructivenessToDestroy, minSpeedToDestroy, perkDestructiveness, perkDuration, superSpeedDuration);
 };
@@ -136,6 +136,7 @@ struct Settings {
 					ImGui::DragFloat("Perk Duration", &entry.second->perkDuration, 0.01f);
 					ImGui::DragFloat("Perk Destructiveness", &entry.second->perkDestructiveness, 0.01f);
 					ImGui::DragFloat("SuperSpeed Duration", &entry.second->superSpeedDuration, 0.01f);
+					ImGui::Separator();
 					ImGui::PopID();
 				}
 			}
@@ -374,6 +375,12 @@ struct Session {
 					carForwardDirection = {1, 0};
 					carSteerDirection = {1, 0};
 					carSkid = false;
+					carPerks.clear();
+					carSuperSpeedDuration = std::chrono::microseconds(0);
+					for (CellState& cell : cells) {
+						cell.destructed = 0;
+						cell.destructionTime = std::chrono::microseconds(0);
+					}
 				}
 				ImGui::SameLine();
 				ImGui::SetNextItemShortcut(ImGuiMod_Ctrl | ImGuiKey_D);
@@ -411,6 +418,10 @@ struct Session {
 			cameraPosition = carPosition;
 		}
 
+		//---------- End Game ----------//
+
+		const bool game_finished = isGameFinished();
+
 		//---------- Stats ----------//
 
 		if (ImGui::Begin("Car Stats")) {
@@ -419,6 +430,7 @@ struct Session {
 			ImGui::Text("Speed: %f", car_stats.speed);
 			ImGui::Text("Super Speed Duration: %d", carSuperSpeedDuration.count());
 			ImGui::Text("Perks: %d", carPerks.size());
+			ImGui::Text("Game Finished: %d", int(game_finished));
 			ImGui::EndDisabled();
 		}
 		ImGui::End();
@@ -546,6 +558,10 @@ struct Session {
 				carForwardDirection = glm::reflect(carForwardDirection, float2(0, -1));
 			}
 		}
+	}
+
+	bool isGameFinished() const {
+		return std::all_of(cells.begin(), cells.end(), [](const CellState& cell) { return cell.buildingType == BuildingType::None || cell.destructed; });
 	}
 
 	void renderEntity(const float2& world_coords, const float world_size, SDL_Texture* texture, SDL_Renderer* renderer) {
