@@ -296,8 +296,11 @@ struct Session {
 	std::unique_ptr<tson::Map> level;
 	std::vector<CellState> cells;
 
+	std::chrono::microseconds sessionTime;
+	std::optional<std::chrono::microseconds> finishTime;
+
 	Session(const Settings& _settings, const Content& _content, SDL_Window* _window, SDL_Renderer* _renderer, const std::filesystem::path& level_path)
-		: settings(_settings), content(_content), cameraShaker(settings), window(_window), renderer(_renderer) {
+		: settings(_settings), content(_content), cameraShaker(settings), window(_window), renderer(_renderer), sessionTime(0) {
 
 		tson::Tileson parser(std::unique_ptr<tson::NlohmannJson>(new tson::NlohmannJson));
 		level = parser.parse(level_path);
@@ -386,7 +389,7 @@ struct Session {
 		return render_pos;
 	}
 
-	void update(const std::chrono::microseconds game_time, const std::chrono::microseconds delta_time) {
+	void update(const std::chrono::microseconds delta_real_time) {
 		bool debug_simulation = false;
 
 		//---------- Debug Ui ----------//
@@ -454,10 +457,11 @@ struct Session {
 				__debugbreak();
 			}
 
-			car_stats = updateCarPerks(delta_time);
-			updateCarDrive(delta_time, car_stats);
-			updateCarCollisions(game_time, car_stats);
-			cameraShaker.update(delta_time);
+			sessionTime += delta_real_time;
+			car_stats = updateCarPerks(delta_real_time);
+			updateCarDrive(delta_real_time, car_stats);
+			updateCarCollisions(sessionTime, car_stats);
+			cameraShaker.update(delta_real_time);
 		}
 
 		if (cameraFollowCar) {
@@ -466,7 +470,9 @@ struct Session {
 
 		//---------- End Game ----------//
 
-		const bool game_finished = isGameFinished();
+		if (!finishTime.has_value() && isGameFinished()) {
+			finishTime = sessionTime;
+		}
 
 		//---------- Stats ----------//
 
@@ -476,7 +482,12 @@ struct Session {
 			ImGui::Text("Speed: %f", car_stats.speed);
 			ImGui::Text("Super Speed Duration: %d", carSuperSpeedDuration.count());
 			ImGui::Text("Perks: %d", carPerks.size());
-			ImGui::Text("Game Finished: %d", int(game_finished));
+			ImGui::Text("Session Time: %.2fs", float(sessionTime.count()) / 1000000);
+			if (!finishTime.has_value()) {
+				ImGui::Text("Finish Time: none");
+			} else {
+				ImGui::Text("Finish Time: %.2fs", float(finishTime->count()) / 1000000);
+			}
 			ImGui::EndDisabled();
 		}
 		ImGui::End();
@@ -621,7 +632,7 @@ struct Session {
 		SDL_assert(render_ok);
 	}
 
-	void render(const std::chrono::microseconds game_time, const std::chrono::microseconds delta_time) {
+	void render() {
 		//---------- Ground ----------//
 
 		for (int i = 0; i < worldSize.y; ++i) {
@@ -634,10 +645,10 @@ struct Session {
 
 		//---------- Buildings and Car ----------//
 		{
-			auto get_destructed_frame = [&game_time](const CellState& cell, const Flipbook& flipbook) -> SDL_Texture* {
+			auto get_destructed_frame = [this](const CellState& cell, const Flipbook& flipbook) -> SDL_Texture* {
 				if (cell.destructed) {
 					const int usec_per_frame = 1000000 / 45;
-					const int frame = (game_time - cell.destructionTime).count() / usec_per_frame;
+					const int frame = (sessionTime - cell.destructionTime).count() / usec_per_frame;
 					return flipbook.textures.at(std::clamp<int>(frame, 0, flipbook.textures.size() - 1));
 				} else {
 					return flipbook.textures.front();
@@ -669,7 +680,7 @@ struct Session {
 
 							if (cell.destructed) {
 								const int usec_per_frame = 1000000 / 45;
-								const int frame = (game_time - cell.destructionTime).count() / usec_per_frame;
+								const int frame = (sessionTime - cell.destructionTime).count() / usec_per_frame;
 								building_texture = flipbook->textures.at(std::clamp<int>(frame, 0, flipbook->textures.size() - 1));
 							} else {
 								building_texture = flipbook->textures.front();
@@ -818,7 +829,7 @@ SDL_AppResult SDL_AppIterate(void* appstate) {
 	ImGui::DockSpaceOverViewport(0, nullptr, ImGuiDockNodeFlags_PassthruCentralNode);
 
 	app->settings.update(*app->storage);
-	app->session->update(app->currentTime, app->deltaTime);
+	app->session->update(app->deltaTime);
 
 	const bool set_color_ok = SDL_SetRenderDrawColorFloat(app->renderer, 0, 0, 0, 1);
 	SDL_assert(set_color_ok);
@@ -826,7 +837,7 @@ SDL_AppResult SDL_AppIterate(void* appstate) {
 	const bool clear_ok = SDL_RenderClear(app->renderer);
 	SDL_assert(clear_ok);
 
-	app->session->render(app->currentTime, app->deltaTime);
+	app->session->render();
 
 	ImGui::Render();
 	if (app->showDebugUi) {
