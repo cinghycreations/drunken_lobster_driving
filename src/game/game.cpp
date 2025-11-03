@@ -157,7 +157,7 @@ struct Flipbook {
 struct Content {
 	Storage& storage;
 	Flipbook carFlipbook;
-	Flipbook roadsFlipbook;
+	Flipbook groundFlipbook;
 	Flipbook gardenFlipbook;
 	Flipbook gaspumpFlipbook;
 	Flipbook houseFlipbook;
@@ -165,16 +165,15 @@ struct Content {
 	Flipbook skyscraperFlipbook;
 
 	Content(Storage& _storage, SDL_Renderer* renderer)
-		: storage(_storage), carFlipbook(storage, renderer, "car/car{:04}.png", 1), roadsFlipbook(storage, renderer, "roads/road{:04}.png", 1),
+		: storage(_storage), carFlipbook(storage, renderer, "car/car{:04}.png", 1), groundFlipbook(storage, renderer, "roads/road{:04}.png", 1),
 		  gardenFlipbook(storage, renderer, "buildings/garden{:04}.png", 0), gaspumpFlipbook(storage, renderer, "buildings/gaspump{:04}.png", 0),
 		  houseFlipbook(storage, renderer, "buildings/house{:04}.png", 0), nuclearFlipbook(storage, renderer, "buildings/nuclear{:04}.png", 0),
 		  skyscraperFlipbook(storage, renderer, "buildings/skyscraper{:04}.png", 0) {}
 };
 
 struct Session {
-
-	enum class CellType {
-		Road,
+	enum class BuildingType {
+		None,
 		Garden,
 		House,
 		GasPump,
@@ -183,8 +182,8 @@ struct Session {
 	};
 
 	struct CellState {
-		CellType type;
-		uint32_t roadTile;
+		uint32_t groundTile;
+		BuildingType buildingType;
 		bool destructed;
 		std::chrono::microseconds destructionTime;
 	};
@@ -217,49 +216,56 @@ struct Session {
 		tson::Tileson parser(std::unique_ptr<tson::NlohmannJson>(new tson::NlohmannJson));
 		level = parser.parse(level_path);
 		SDL_assert(level->getStatus() == tson::ParseStatus::OK);
-		SDL_assert(level->getLayers().size() == 1);
-		SDL_assert(level->getLayers().front().getType() == tson::LayerType::TileLayer);
+		SDL_assert(level->getLayers().size() == 2);
+		SDL_assert(level->getLayer("ground"));
+		SDL_assert(level->getLayer("buildings"));
+		SDL_assert(level->getLayer("ground")->getType() == tson::LayerType::TileLayer);
+		SDL_assert(level->getLayer("buildings")->getType() == tson::LayerType::TileLayer);
+		SDL_assert(level->getTilesets().size() == 2);
+		SDL_assert(level->getTileset("ground"));
 		SDL_assert(level->getTileset("buildings"));
-		SDL_assert(level->getTileset("roads"));
 
 		worldSize = int2(level->getSize().x, level->getSize().y);
 		cells.resize(worldSize.x * worldSize.y);
 
 		{
+			const tson::Layer* ground_layer = level->getLayer("ground");
+			const tson::Layer* buildings_layer = level->getLayer("buildings");
+			const tson::Tileset* ground_tileset = level->getTileset("ground");
 			const tson::Tileset* buildings_tileset = level->getTileset("buildings");
-			const tson::Tileset* roads_tileset = level->getTileset("roads");
-			const auto& tile_data = level->getLayers().front().getTileData();
 
 			for (int i = 0; i < worldSize.y; ++i) {
 				for (int j = 0; j < worldSize.y; ++j) {
-					SDL_assert(tile_data.count({j, i}));
-					const tson::Tile* tile = tile_data.at({j, i});
-					SDL_assert(tile->getTileset() == buildings_tileset || tile->getTileset() == roads_tileset);
-
 					CellState& cell = cells.at(i * worldSize.x + j);
 
-					if (tile->getTileset() == roads_tileset) {
-						cell.type = CellType::Road;
-						cell.roadTile = tile->getId() - 1;
-					} else if (tile->getTileset() == buildings_tileset) {
-						const uint32_t id = tile->getId() - 1;
-						SDL_assert(id <= 4);
-
-						if (id == 0) {
-							cell.type = CellType::GasPump;
-						} else if (id == 1) {
-							cell.type = CellType::House;
-						} else if (id == 2) {
-							cell.type = CellType::Nuclear;
-						} else if (id == 3) {
-							cell.type = CellType::Skyscraper;
-						} else if (id == 4) {
-							cell.type = CellType::Garden;
-						}
+					{
+						SDL_assert(ground_layer->getTileData().count({j, i}));
+						const tson::Tile* ground_tile = ground_layer->getTileData().at({j, i});
+						SDL_assert(ground_tile->getTileset() == ground_tileset);
+						cell.groundTile = ground_tile->getId() - 1;
 					}
 
-					cell.destructed = false;
-					cell.destructionTime = std::chrono::microseconds(0);
+					if (buildings_layer->getTileData().count({j, i})) {
+						const tson::Tile* buildings_tile = buildings_layer->getTileData().at({j, i});
+						SDL_assert(buildings_tile->getTileset() == buildings_tileset);
+						const int buildings_id = buildings_tile->getId() - 1;
+						SDL_assert(buildings_id >= 0 && buildings_id <= 4);
+
+						if (buildings_id == 0) {
+							cell.buildingType = BuildingType::House;
+						} else if (buildings_id == 1) {
+							cell.buildingType = BuildingType::GasPump;
+						} else if (buildings_id == 2) {
+							cell.buildingType = BuildingType::Nuclear;
+						} else if (buildings_id == 3) {
+							cell.buildingType = BuildingType::Skyscraper;
+						} else if (buildings_id == 4) {
+							cell.buildingType = BuildingType::Garden;
+						}
+
+						cell.destructed = false;
+						cell.destructionTime = std::chrono::microseconds(0);
+					}
 				}
 			}
 		}
@@ -415,14 +421,14 @@ struct Session {
 			bouncing = true;
 		} else {
 			CellState& cell = cells.at(curr_tile.y * worldSize.x + curr_tile.x);
-			if (cell.type == CellType::Garden) {
+			if (cell.buildingType == BuildingType::Garden) {
 				if (cell.destructed) {
 				} else {
 					cell.destructed = true;
 					cell.destructionTime = game_time;
 					gameplayDestructiveness += settings.gameplay.gardenDestructivenessBonus;
 				}
-			} else if (cell.type == CellType::House) {
+			} else if (cell.buildingType == BuildingType::House) {
 				if (cell.destructed) {
 				} else if (gameplayDestructiveness >= settings.gameplay.houseResistance) {
 					cell.destructed = true;
@@ -431,11 +437,11 @@ struct Session {
 				} else {
 					bouncing = true;
 				}
-			} else if (cell.type == CellType::GasPump) {
+			} else if (cell.buildingType == BuildingType::GasPump) {
 				bouncing = true;
-			} else if (cell.type == CellType::Skyscraper) {
+			} else if (cell.buildingType == BuildingType::Skyscraper) {
 				bouncing = true;
-			} else if (cell.type == CellType::Nuclear) {
+			} else if (cell.buildingType == BuildingType::Nuclear) {
 				bouncing = true;
 			}
 		}
@@ -474,47 +480,78 @@ struct Session {
 	}
 
 	void render(const std::chrono::microseconds game_time, const std::chrono::microseconds delta_time) {
-		renderLevel(game_time);
-		renderCar();
-		if (renderEnableGrid) {
-			renderGrid();
-		}
-	}
-
-	void renderLevel(const std::chrono::microseconds game_time) {
-
-		auto get_destructed_frame = [&game_time](const CellState& cell, const Flipbook& flipbook) -> SDL_Texture* {
-			if (cell.destructed) {
-				const int usec_per_frame = 1000000 / 45;
-				const int frame = (game_time - cell.destructionTime).count() / usec_per_frame;
-				return flipbook.textures.at(std::clamp<int>(frame, 0, flipbook.textures.size() - 1));
-			} else {
-				return flipbook.textures.front();
-			}
-		};
+		//---------- Ground ----------//
 
 		for (int i = 0; i < worldSize.y; ++i) {
 			for (int j = 0; j < worldSize.y; ++j) {
 				const CellState& cell = cells.at(i * worldSize.x + j);
-				SDL_Texture* texture = nullptr;
-
-				if (cell.type == CellType::Road) {
-					texture = content.roadsFlipbook.textures.at(cell.roadTile);
-					renderEntity(float2(j, i) + float2(0.5f), 1, texture, renderer);
-				} else if (cell.type == CellType::Garden) {
-					texture = get_destructed_frame(cell, content.gardenFlipbook);
-				} else if (cell.type == CellType::House) {
-					texture = get_destructed_frame(cell, content.houseFlipbook);
-				} else if (cell.type == CellType::GasPump) {
-					texture = get_destructed_frame(cell, content.gaspumpFlipbook);
-				} else if (cell.type == CellType::Nuclear) {
-					texture = get_destructed_frame(cell, content.nuclearFlipbook);
-				} else if (cell.type == CellType::Skyscraper) {
-					texture = get_destructed_frame(cell, content.skyscraperFlipbook);
-				}
-
-				renderEntity(float2(j, i) + float2(0.5f), 1, texture, renderer);
+				SDL_Texture* ground_texture = content.groundFlipbook.textures.at(cell.groundTile);
+				renderEntity(float2(j, i) + float2(0.5f), 1, ground_texture, renderer);
 			}
+		}
+
+		//---------- Buildings and Car ----------//
+		{
+			auto get_destructed_frame = [&game_time](const CellState& cell, const Flipbook& flipbook) -> SDL_Texture* {
+				if (cell.destructed) {
+					const int usec_per_frame = 1000000 / 45;
+					const int frame = (game_time - cell.destructionTime).count() / usec_per_frame;
+					return flipbook.textures.at(std::clamp<int>(frame, 0, flipbook.textures.size() - 1));
+				} else {
+					return flipbook.textures.front();
+				}
+			};
+
+			for (int i = 0; i < worldSize.y; ++i) {
+				for (int j = 0; j < worldSize.y; ++j) {
+					//---------- Building ----------//
+
+					{
+						const CellState& cell = cells.at(i * worldSize.x + j);
+						const Flipbook* flipbook = nullptr;
+
+						if (cell.buildingType == BuildingType::Garden) {
+							flipbook = &content.gardenFlipbook;
+						} else if (cell.buildingType == BuildingType::House) {
+							flipbook = &content.houseFlipbook;
+						} else if (cell.buildingType == BuildingType::GasPump) {
+							flipbook = &content.gaspumpFlipbook;
+						} else if (cell.buildingType == BuildingType::Nuclear) {
+							flipbook = &content.nuclearFlipbook;
+						} else if (cell.buildingType == BuildingType::Skyscraper) {
+							flipbook = &content.skyscraperFlipbook;
+						}
+
+						if (flipbook) {
+							SDL_Texture* building_texture = nullptr;
+
+							if (cell.destructed) {
+								const int usec_per_frame = 1000000 / 45;
+								const int frame = (game_time - cell.destructionTime).count() / usec_per_frame;
+								building_texture = flipbook->textures.at(std::clamp<int>(frame, 0, flipbook->textures.size() - 1));
+							} else {
+								building_texture = flipbook->textures.front();
+							}
+
+							renderEntity(float2(j, i) + float2(0.5f), 1, building_texture, renderer);
+						}
+					}
+
+					//---------- Car ----------//
+
+					if (int2(carPosition) == int2(j, i)) {
+						const float car_rotation = glm::orientedAngle(carSteerDirection, float2(1, 0));
+						const float pi2 = std::numbers::pi * 2;
+						const float rotation = car_rotation > 0 ? car_rotation : pi2 - std::fmod(-car_rotation, pi2);
+						const int frame = int(rotation / pi2 * content.carFlipbook.textures.size()) % content.carFlipbook.textures.size();
+						renderEntity(carPosition, settings.car.size, content.carFlipbook.textures.at(frame), renderer);
+					}
+				}
+			}
+		}
+
+		if (renderEnableGrid) {
+			renderGrid();
 		}
 	}
 
