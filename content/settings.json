@@ -3,9 +3,47 @@
 		"zoom": 0.6000000238418579
 	},
 	"car": {
+		"baseSpeed": 1.0,
 		"grip": 0.4000000059604645,
 		"mouseSensibility": 0.009999999776482582,
-		"size": 0.20000000298023224,
-		"speed": 1.0
+		"size": 0.30000001192092896,
+		"superSpeed": 2.0
+	},
+	"gameplay": {
+		"garden": {
+			"minDestructivenessToDestroy": 0.0,
+			"minSpeedToDestroy": 0.0,
+			"perkDestructiveness": 0.25,
+			"perkDuration": 10000000.0,
+			"superSpeedDuration": 0.0
+		},
+		"gaspump": {
+			"minDestructivenessToDestroy": 1.0,
+			"minSpeedToDestroy": 0.0,
+			"perkDestructiveness": 0.0,
+			"perkDuration": 0.0,
+			"superSpeedDuration": 2.0
+		},
+		"house": {
+			"minDestructivenessToDestroy": 1.0,
+			"minSpeedToDestroy": 0.0,
+			"perkDestructiveness": 0.0,
+			"perkDuration": 10000000.0,
+			"superSpeedDuration": 0.0
+		},
+		"nuclear": {
+			"minDestructivenessToDestroy": 0.0,
+			"minSpeedToDestroy": 0.0,
+			"perkDestructiveness": 0.0,
+			"perkDuration": 0.0,
+			"superSpeedDuration": 0.0
+		},
+		"skyscraper": {
+			"minDestructivenessToDestroy": 0.0,
+			"minSpeedToDestroy": 0.0,
+			"perkDestructiveness": 0.0,
+			"perkDuration": 0.0,
+			"superSpeedDuration": 0.0
+		}
 	}
 }

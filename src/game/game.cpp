@@ -60,19 +60,32 @@ struct CameraSettings {
 
 struct CarSettings {
 	float size = 0.2f;
-	float speed = 0.1f;
+	float baseSpeed = 0.1f;
+	float superSpeed = 0.2f;
 	float mouseSensibility = 0.01f;
 	float grip = 1;
 
-	NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(CarSettings, size, speed, mouseSensibility, grip);
+	NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(CarSettings, size, baseSpeed, superSpeed, mouseSensibility, grip);
+};
+
+struct BuildingSettings {
+	float minDestructivenessToDestroy;
+	float minSpeedToDestroy;
+	float perkDuration;
+	float perkDestructiveness;
+	float superSpeedDuration;
+
+	NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(BuildingSettings, minDestructivenessToDestroy, minSpeedToDestroy, perkDestructiveness, perkDuration, superSpeedDuration);
 };
 
 struct GameplaySettings {
-	float gardenDestructivenessBonus = 0.25;
-	float houseResistance = 1;
-	float houseDestructivenessBonus = 1;
+	BuildingSettings garden;
+	BuildingSettings house;
+	BuildingSettings gaspump;
+	BuildingSettings skyscraper;
+	BuildingSettings nuclear;
 
-	NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(GameplaySettings, gardenDestructivenessBonus, houseResistance, houseDestructivenessBonus);
+	NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(GameplaySettings, garden, house, gaspump, skyscraper, nuclear);
 };
 
 struct Settings {
@@ -100,15 +113,31 @@ struct Settings {
 
 			if (ImGui::CollapsingHeader("Car", ImGuiTreeNodeFlags_DefaultOpen)) {
 				ImGui::DragFloat("Size", &car.size, 0.01f, 0.01f, 5);
-				ImGui::DragFloat("Speed", &car.speed, 0.01f);
+				ImGui::DragFloat("Base Speed", &car.baseSpeed, 0.01f);
+				ImGui::DragFloat("Super Speed", &car.superSpeed, 0.01f);
 				ImGui::DragFloat("Mouse Sensibility", &car.mouseSensibility, 0.01f);
 				ImGui::SliderFloat("Grip", &car.grip, 0, 1);
 			}
 
 			if (ImGui::CollapsingHeader("Gameplay", ImGuiTreeNodeFlags_DefaultOpen)) {
-				ImGui::DragFloat("Garden Destructiveness Bonus", &gameplay.gardenDestructivenessBonus, 0.01f);
-				ImGui::DragFloat("House Resistance", &gameplay.houseResistance, 0.01f);
-				ImGui::DragFloat("House Destructiveness Bonus", &gameplay.houseDestructivenessBonus, 0.01f);
+				const std::array<std::pair<const char*, BuildingSettings*>, 5> entries = {{
+					{"Garden", &gameplay.garden},
+					{"House", &gameplay.house},
+					{"Gaspump", &gameplay.gaspump},
+					{"Skyscraper", &gameplay.skyscraper},
+					{"Nuclear", &gameplay.nuclear},
+				}};
+
+				for (const auto& entry : entries) {
+					ImGui::PushID(entry.first);
+					ImGui::Text("%s", entry.first);
+					ImGui::DragFloat("Min Destructiveness To Destroy", &entry.second->minDestructivenessToDestroy, 0.01f);
+					ImGui::DragFloat("Min Speed To Destroy", &entry.second->minSpeedToDestroy, 0.01f);
+					ImGui::DragFloat("Perk Duration", &entry.second->perkDuration, 0.01f);
+					ImGui::DragFloat("Perk Destructiveness", &entry.second->perkDestructiveness, 0.01f);
+					ImGui::DragFloat("SuperSpeed Duration", &entry.second->superSpeedDuration, 0.01f);
+					ImGui::PopID();
+				}
 			}
 		}
 		ImGui::End();
@@ -188,6 +217,16 @@ struct Session {
 		std::chrono::microseconds destructionTime;
 	};
 
+	struct CarPerk {
+		std::chrono::microseconds durationLeft;
+		float destructiveness;
+	};
+
+	struct CarStats {
+		float destructiveness;
+		float speed;
+	};
+
 	const Settings& settings;
 	const Content& content;
 	SDL_Window* window;
@@ -205,7 +244,8 @@ struct Session {
 	float2 carSteerDirection = {1, 0};
 	bool carSkid = false;
 
-	float gameplayDestructiveness = 0;
+	std::list<CarPerk> carPerks;
+	std::chrono::microseconds carSuperSpeedDuration;
 
 	std::unique_ptr<tson::Map> level;
 	std::vector<CellState> cells;
@@ -350,30 +390,66 @@ struct Session {
 				ImGui::Checkbox("Skid", &carSkid);
 				ImGui::EndDisabled();
 			}
-
-			if (ImGui::CollapsingHeader("Gameplay", ImGuiTreeNodeFlags_DefaultOpen)) {
-				ImGui::DragFloat("Destructiveness", &gameplayDestructiveness);
-			}
 		}
 		ImGui::End();
 
 		//---------- Car ----------//
+
+		CarStats car_stats{.destructiveness = 0, .speed = 0};
 
 		if (!carPaused) {
 			if (debug_simulation) {
 				__debugbreak();
 			}
 
-			updateCarDrive(delta_time);
-			updateCarCollisions(game_time);
+			car_stats = updateCarPerks(delta_time);
+			updateCarDrive(delta_time, car_stats);
+			updateCarCollisions(game_time, car_stats);
 		}
 
 		if (cameraFollowCar) {
 			cameraPosition = carPosition;
 		}
+
+		//---------- Stats ----------//
+
+		if (ImGui::Begin("Car Stats")) {
+			ImGui::BeginDisabled(carPaused);
+			ImGui::Text("Destructiveness: %f", car_stats.destructiveness);
+			ImGui::Text("Speed: %f", car_stats.speed);
+			ImGui::Text("Super Speed Duration: %d", carSuperSpeedDuration.count());
+			ImGui::Text("Perks: %d", carPerks.size());
+			ImGui::EndDisabled();
+		}
+		ImGui::End();
 	}
 
-	void updateCarDrive(const std::chrono::microseconds delta_time) {
+	CarStats updateCarPerks(const std::chrono::microseconds delta_time) {
+		CarStats stats;
+
+		stats.destructiveness = 0;
+		for (auto perk_iter = carPerks.begin(); perk_iter != carPerks.end();) {
+			if (perk_iter->durationLeft < delta_time) {
+				perk_iter = carPerks.erase(perk_iter);
+			} else {
+				perk_iter->durationLeft -= delta_time;
+				stats.destructiveness += perk_iter->destructiveness;
+				++perk_iter;
+			}
+		}
+
+		if (carSuperSpeedDuration > delta_time) {
+			stats.speed = settings.car.superSpeed;
+			carSuperSpeedDuration -= delta_time;
+		} else {
+			stats.speed = settings.car.baseSpeed;
+			carSuperSpeedDuration = std::chrono::microseconds(0);
+		}
+
+		return stats;
+	}
+
+	void updateCarDrive(const std::chrono::microseconds delta_time, const CarStats& car_stats) {
 		carPrevPosition = carPosition;
 
 		float mouse_delta_x;
@@ -387,10 +463,10 @@ struct Session {
 		const float max_angle = glm::radians(settings.car.grip * 360) * delta_secs;
 		carSkid = std::fabs(wanted_angle) >= max_angle;
 		carForwardDirection = glm::rotate(carForwardDirection, std::clamp(wanted_angle, -max_angle, max_angle));
-		carPosition += carForwardDirection * settings.car.speed * delta_secs;
+		carPosition += carForwardDirection * car_stats.speed * delta_secs;
 	}
 
-	void updateCarCollisions(const std::chrono::microseconds game_time) {
+	void updateCarCollisions(const std::chrono::microseconds game_time, const CarStats& stats) {
 		const float2 delta = carPosition - carPrevPosition;
 		int2 prev_tile = glm::floor(carPrevPosition);
 		int2 curr_tile = glm::floor(carPosition);
@@ -421,28 +497,31 @@ struct Session {
 			bouncing = true;
 		} else {
 			CellState& cell = cells.at(curr_tile.y * worldSize.x + curr_tile.x);
+			const BuildingSettings* building_settings = nullptr;
+
 			if (cell.buildingType == BuildingType::Garden) {
-				if (cell.destructed) {
-				} else {
-					cell.destructed = true;
-					cell.destructionTime = game_time;
-					gameplayDestructiveness += settings.gameplay.gardenDestructivenessBonus;
-				}
+				building_settings = &settings.gameplay.garden;
 			} else if (cell.buildingType == BuildingType::House) {
+				building_settings = &settings.gameplay.house;
+			} else if (cell.buildingType == BuildingType::GasPump) {
+				building_settings = &settings.gameplay.gaspump;
+			} else if (cell.buildingType == BuildingType::Skyscraper) {
+				building_settings = &settings.gameplay.skyscraper;
+			} else if (cell.buildingType == BuildingType::Nuclear) {
+				building_settings = &settings.gameplay.nuclear;
+			}
+
+			if (building_settings) {
 				if (cell.destructed) {
-				} else if (gameplayDestructiveness >= settings.gameplay.houseResistance) {
+				} else if (stats.destructiveness >= building_settings->minDestructivenessToDestroy && stats.speed >= building_settings->minSpeedToDestroy) {
 					cell.destructed = true;
 					cell.destructionTime = game_time;
-					gameplayDestructiveness += settings.gameplay.houseDestructivenessBonus;
+					carPerks.emplace_back(CarPerk{.durationLeft = std::chrono::microseconds(unsigned int(building_settings->perkDuration * 1000000)),
+												  .destructiveness = building_settings->perkDestructiveness});
+					carSuperSpeedDuration += std::chrono::microseconds(unsigned int(building_settings->superSpeedDuration * 1000000));
 				} else {
 					bouncing = true;
 				}
-			} else if (cell.buildingType == BuildingType::GasPump) {
-				bouncing = true;
-			} else if (cell.buildingType == BuildingType::Skyscraper) {
-				bouncing = true;
-			} else if (cell.buildingType == BuildingType::Nuclear) {
-				bouncing = true;
 			}
 		}
 
@@ -637,7 +716,7 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[]) {
 	}
 
 	app->content.reset(new Content(*app->storage, app->renderer));
-	app->session.reset(new Session(app->settings, *app->content, app->window, app->renderer, "levels/testbed.tmj"));
+	app->session.reset(new Session(app->settings, *app->content, app->window, app->renderer, "levels/level0.tmj"));
 	app->currentTime = std::chrono::microseconds(SDL_GetTicksNS() / 1000);
 
 	*appstate = app;
