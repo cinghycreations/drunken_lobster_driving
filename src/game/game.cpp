@@ -67,9 +67,18 @@ struct CarSettings {
 	NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(CarSettings, size, speed, mouseSensibility, grip);
 };
 
+struct GameplaySettings {
+	float gardenDestructivenessBonus = 0.25;
+	float houseResistance = 1;
+	float houseDestructivenessBonus = 1;
+
+	NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(GameplaySettings, gardenDestructivenessBonus, houseResistance, houseDestructivenessBonus);
+};
+
 struct Settings {
 	CameraSettings camera;
 	CarSettings car;
+	GameplaySettings gameplay;
 
 	void update(const Storage& storage) {
 		if (ImGui::Begin("Settings")) {
@@ -95,11 +104,17 @@ struct Settings {
 				ImGui::DragFloat("Mouse Sensibility", &car.mouseSensibility, 0.01f);
 				ImGui::SliderFloat("Grip", &car.grip, 0, 1);
 			}
+
+			if (ImGui::CollapsingHeader("Gameplay", ImGuiTreeNodeFlags_DefaultOpen)) {
+				ImGui::DragFloat("Garden Destructiveness Bonus", &gameplay.gardenDestructivenessBonus, 0.01f);
+				ImGui::DragFloat("House Resistance", &gameplay.houseResistance, 0.01f);
+				ImGui::DragFloat("House Destructiveness Bonus", &gameplay.houseDestructivenessBonus, 0.01f);
+			}
 		}
 		ImGui::End();
 	}
 
-	NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(Settings, camera, car);
+	NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(Settings, camera, car, gameplay);
 };
 
 struct Flipbook {
@@ -190,6 +205,8 @@ struct Session {
 	float2 carForwardDirection = {1, 0};
 	float2 carSteerDirection = {1, 0};
 	bool carSkid = false;
+
+	float gameplayDestructiveness = 0;
 
 	std::unique_ptr<tson::Map> level;
 	std::vector<CellState> cells;
@@ -327,6 +344,10 @@ struct Session {
 				ImGui::Checkbox("Skid", &carSkid);
 				ImGui::EndDisabled();
 			}
+
+			if (ImGui::CollapsingHeader("Gameplay", ImGuiTreeNodeFlags_DefaultOpen)) {
+				ImGui::DragFloat("Destructiveness", &gameplayDestructiveness);
+			}
 		}
 		ImGui::End();
 
@@ -338,7 +359,7 @@ struct Session {
 			}
 
 			updateCarDrive(delta_time);
-			updateCarCollisions();
+			updateCarCollisions(game_time);
 		}
 
 		if (cameraFollowCar) {
@@ -363,21 +384,7 @@ struct Session {
 		carPosition += carForwardDirection * settings.car.speed * delta_secs;
 	}
 
-	bool isTileSolid(const int2& coords) {
-		if (coords.x < 0 || coords.x >= worldSize.x || coords.y < 0 || coords.y >= worldSize.y) {
-			return true;
-		}
-
-		const CellState& cell = cells.at(coords.y * worldSize.x + coords.x);
-		if (cell.type == CellType::Garden || cell.type == CellType::House || cell.type == CellType::GasPump || cell.type == CellType::Skyscraper ||
-			cell.type == CellType::Nuclear) {
-			return true;
-		}
-
-		return false;
-	}
-
-	void updateCarCollisions() {
+	void updateCarCollisions(const std::chrono::microseconds game_time) {
 		const float2 delta = carPosition - carPrevPosition;
 		int2 prev_tile = glm::floor(carPrevPosition);
 		int2 curr_tile = glm::floor(carPosition);
@@ -402,7 +409,38 @@ struct Session {
 			curr_tile = prev_tile + (delta.x > delta.y ? int2(-1, 0) : int2(0, 1));
 		}
 
-		if (isTileSolid(curr_tile)) {
+		bool bouncing = false;
+
+		if (curr_tile.x < 0 || curr_tile.x >= worldSize.x || curr_tile.y < 0 || curr_tile.y >= worldSize.y) {
+			bouncing = true;
+		} else {
+			CellState& cell = cells.at(curr_tile.y * worldSize.x + curr_tile.x);
+			if (cell.type == CellType::Garden) {
+				if (cell.destructed) {
+				} else {
+					cell.destructed = true;
+					cell.destructionTime = game_time;
+					gameplayDestructiveness += settings.gameplay.gardenDestructivenessBonus;
+				}
+			} else if (cell.type == CellType::House) {
+				if (cell.destructed) {
+				} else if (gameplayDestructiveness >= settings.gameplay.houseResistance) {
+					cell.destructed = true;
+					cell.destructionTime = game_time;
+					gameplayDestructiveness += settings.gameplay.houseDestructivenessBonus;
+				} else {
+					bouncing = true;
+				}
+			} else if (cell.type == CellType::GasPump) {
+				bouncing = true;
+			} else if (cell.type == CellType::Skyscraper) {
+				bouncing = true;
+			} else if (cell.type == CellType::Nuclear) {
+				bouncing = true;
+			}
+		}
+
+		if (bouncing) {
 			if (curr_tile == prev_tile + int2(1, 0)) {
 				carPosition = float2(curr_tile.x, carPosition.y);
 				carForwardDirection = glm::reflect(carForwardDirection, float2(-1, 0));
@@ -435,15 +473,26 @@ struct Session {
 		SDL_assert(render_ok);
 	}
 
-	void render() {
-		renderLevel();
+	void render(const std::chrono::microseconds game_time, const std::chrono::microseconds delta_time) {
+		renderLevel(game_time);
 		renderCar();
 		if (renderEnableGrid) {
 			renderGrid();
 		}
 	}
 
-	void renderLevel() {
+	void renderLevel(const std::chrono::microseconds game_time) {
+
+		auto get_destructed_frame = [&game_time](const CellState& cell, const Flipbook& flipbook) -> SDL_Texture* {
+			if (cell.destructed) {
+				const int usec_per_frame = 1000000 / 45;
+				const int frame = (game_time - cell.destructionTime).count() / usec_per_frame;
+				return flipbook.textures.at(std::clamp<int>(frame, 0, flipbook.textures.size() - 1));
+			} else {
+				return flipbook.textures.front();
+			}
+		};
+
 		for (int i = 0; i < worldSize.y; ++i) {
 			for (int j = 0; j < worldSize.y; ++j) {
 				const CellState& cell = cells.at(i * worldSize.x + j);
@@ -453,15 +502,15 @@ struct Session {
 					texture = content.roadsFlipbook.textures.at(cell.roadTile);
 					renderEntity(float2(j, i) + float2(0.5f), 1, texture, renderer);
 				} else if (cell.type == CellType::Garden) {
-					texture = content.gardenFlipbook.textures.front();
+					texture = get_destructed_frame(cell, content.gardenFlipbook);
 				} else if (cell.type == CellType::House) {
-					texture = content.houseFlipbook.textures.front();
+					texture = get_destructed_frame(cell, content.houseFlipbook);
 				} else if (cell.type == CellType::GasPump) {
-					texture = content.gaspumpFlipbook.textures.front();
+					texture = get_destructed_frame(cell, content.gaspumpFlipbook);
 				} else if (cell.type == CellType::Nuclear) {
-					texture = content.nuclearFlipbook.textures.front();
+					texture = get_destructed_frame(cell, content.nuclearFlipbook);
 				} else if (cell.type == CellType::Skyscraper) {
-					texture = content.skyscraperFlipbook.textures.front();
+					texture = get_destructed_frame(cell, content.skyscraperFlipbook);
 				}
 
 				renderEntity(float2(j, i) + float2(0.5f), 1, texture, renderer);
@@ -598,7 +647,7 @@ SDL_AppResult SDL_AppIterate(void* appstate) {
 	const bool clear_ok = SDL_RenderClear(app->renderer);
 	SDL_assert(clear_ok);
 
-	app->session->render();
+	app->session->render(app->currentTime, app->deltaTime);
 
 	ImGui::Render();
 	if (app->showDebugUi) {
