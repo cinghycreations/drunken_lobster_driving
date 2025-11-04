@@ -93,9 +93,11 @@ struct BuildingSettings {
 	float perkDuration = 0;
 	float perkDestructiveness = 0;
 	float superSpeedDuration = 0;
+	float mayhemMultiplier = 1;
 	ShakeSettings shake;
 
-	NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(BuildingSettings, minDestructivenessToDestroy, minSpeedToDestroy, perkDestructiveness, perkDuration, superSpeedDuration, shake);
+	NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(BuildingSettings, minDestructivenessToDestroy, minSpeedToDestroy, perkDestructiveness, perkDuration, superSpeedDuration,
+												mayhemMultiplier, shake);
 };
 
 struct GameplaySettings {
@@ -321,6 +323,7 @@ struct Session {
 
 	std::chrono::microseconds sessionTime;
 	std::optional<std::chrono::microseconds> finishTime;
+	float mayhem = 0;
 
 	Session(const Settings& _settings, const Content& _content, SDL_Window* _window, SDL_Renderer* _renderer, const std::filesystem::path& level_path)
 		: settings(_settings), content(_content), window(_window), renderer(_renderer), sessionTime(0) {
@@ -464,6 +467,9 @@ struct Session {
 						cell.destructed = 0;
 						cell.destructionTime = std::chrono::microseconds(0);
 					}
+					sessionTime = std::chrono::microseconds(0);
+					finishTime.reset();
+					mayhem = 0;
 				}
 				ImGui::SameLine();
 				ImGui::SetNextItemShortcut(ImGuiMod_Ctrl | ImGuiKey_D);
@@ -523,6 +529,7 @@ struct Session {
 			} else {
 				ImGui::Text("Finish Time: %.2fs", TimeUtils::microsecondsToFloatSeconds(*finishTime));
 			}
+			ImGui::Text("Mayhem: %f", mayhem);
 			ImGui::EndDisabled();
 		}
 		ImGui::End();
@@ -634,6 +641,8 @@ struct Session {
 					CarPerk{.durationLeft = TimeUtils::floatSecondsToMicroseconds(building_settings->perkDuration), .destructiveness = building_settings->perkDestructiveness});
 				carSuperSpeedDuration += TimeUtils::floatSecondsToMicroseconds(building_settings->superSpeedDuration);
 				cameraShaker.shake(building_settings->shake);
+
+				mayhem += stats.destructiveness * stats.speed * building_settings->mayhemMultiplier;
 			} else {
 				bouncing = true;
 			}
