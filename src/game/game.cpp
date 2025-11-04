@@ -53,13 +53,18 @@ public:
 	}
 };
 
-struct CameraSettings {
-	float zoom = 1;
+struct ShakeSettings {
 	float shakeTime = 0.5f;
 	float shakePeriod = 0.1f;
 	float shakeStrength = 0.2f;
 
-	NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(CameraSettings, zoom, shakeTime, shakePeriod, shakeStrength);
+	NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(ShakeSettings, shakeTime, shakePeriod, shakeStrength);
+};
+
+struct CameraSettings {
+	float zoom = 1;
+
+	NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(CameraSettings, zoom);
 };
 
 struct CarSettings {
@@ -78,8 +83,9 @@ struct BuildingSettings {
 	float perkDuration = 0;
 	float perkDestructiveness = 0;
 	float superSpeedDuration = 0;
+	ShakeSettings shake;
 
-	NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(BuildingSettings, minDestructivenessToDestroy, minSpeedToDestroy, perkDestructiveness, perkDuration, superSpeedDuration);
+	NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(BuildingSettings, minDestructivenessToDestroy, minSpeedToDestroy, perkDestructiveness, perkDuration, superSpeedDuration, shake);
 };
 
 struct GameplaySettings {
@@ -113,9 +119,6 @@ struct Settings {
 
 			if (ImGui::CollapsingHeader("Camera", ImGuiTreeNodeFlags_DefaultOpen)) {
 				ImGui::DragFloat("Zoom", &camera.zoom, 0.01f, 0.01f, 10);
-				ImGui::DragFloat("Shake Time", &camera.shakeTime, 0.01f);
-				ImGui::DragFloat("Shake Period", &camera.shakePeriod, 0.01f);
-				ImGui::DragFloat("Shake Strength", &camera.shakeStrength, 0.01f);
 			}
 
 			if (ImGui::CollapsingHeader("Car", ImGuiTreeNodeFlags_DefaultOpen)) {
@@ -143,6 +146,9 @@ struct Settings {
 					ImGui::DragFloat("Perk Duration", &entry.second->perkDuration, 0.01f);
 					ImGui::DragFloat("Perk Destructiveness", &entry.second->perkDestructiveness, 0.01f);
 					ImGui::DragFloat("SuperSpeed Duration", &entry.second->superSpeedDuration, 0.01f);
+					ImGui::DragFloat("Shake Time", &entry.second->shake.shakeTime, 0.01f);
+					ImGui::DragFloat("Shake Period", &entry.second->shake.shakePeriod, 0.01f);
+					ImGui::DragFloat("Shake Strength", &entry.second->shake.shakeStrength, 0.01f);
 					ImGui::Separator();
 					ImGui::PopID();
 				}
@@ -211,10 +217,11 @@ struct Content {
 
 class CameraShaker {
 public:
-	CameraShaker(const Settings& _settings) : settings(_settings), maxDuration(std::chrono::microseconds::rep(1000000 * settings.camera.shakeTime)), movement(0, 0) {}
-
-	void shake() {
+	void shake(const ShakeSettings& shake_settings) {
+		maxDuration = std::chrono::microseconds(std::chrono::microseconds::rep(1000000 * shake_settings.shakeTime));
 		durationLeft = maxDuration;
+		period = shake_settings.shakePeriod;
+		strength = shake_settings.shakeStrength;
 	}
 
 	void update(const std::chrono::microseconds& delta_time) {
@@ -222,7 +229,7 @@ public:
 			durationLeft -= delta_time;
 			const float time_secs = float(durationLeft.count()) / float(1000000);
 			const float progress = float(durationLeft.count()) / float(maxDuration.count());
-			const float2 delta = shakeSinusoidal(time_secs, settings.camera.shakePeriod) * settings.camera.shakeStrength;
+			const float2 delta = shakeSinusoidal(time_secs, period) * strength;
 			movement = glm::lerp(float2(0), delta, progress);
 		} else {
 			durationLeft = std::chrono::microseconds(0);
@@ -235,9 +242,11 @@ public:
 	}
 
 private:
-	const Settings& settings;
-	std::chrono::microseconds maxDuration;
-	std::chrono::microseconds durationLeft;
+	std::chrono::microseconds maxDuration = std::chrono::microseconds(0);
+	std::chrono::microseconds durationLeft = std::chrono::microseconds(0);
+	float period = 1;
+	float strength = 0;
+
 	float2 movement;
 
 	static float2 shakeSinusoidal(const float time, const float period) {
@@ -280,6 +289,7 @@ struct Session {
 	SDL_Window* window;
 	SDL_Renderer* renderer;
 	int2 worldSize;
+	float2 worldStartingPosition = {0.5f, 0.5f};
 	bool renderEnableGrid = false;
 	float2 cameraPosition = {0, 0};
 	bool cameraFollowCar = true;
@@ -303,7 +313,7 @@ struct Session {
 	std::optional<std::chrono::microseconds> finishTime;
 
 	Session(const Settings& _settings, const Content& _content, SDL_Window* _window, SDL_Renderer* _renderer, const std::filesystem::path& level_path)
-		: settings(_settings), content(_content), cameraShaker(settings), window(_window), renderer(_renderer), sessionTime(0) {
+		: settings(_settings), content(_content), window(_window), renderer(_renderer), sessionTime(0) {
 
 		tson::Tileson parser(std::unique_ptr<tson::NlohmannJson>(new tson::NlohmannJson));
 		level = parser.parse(level_path);
@@ -370,8 +380,9 @@ struct Session {
 		}
 
 		if (level->getProp("startX") && level->getProp("startY")) {
-			carPosition = float2(level->getProp("startX")->getValue<int>(), level->getProp("startY")->getValue<int>()) + float2(0.5f);
+			worldStartingPosition = float2(level->getProp("startX")->getValue<int>(), level->getProp("startY")->getValue<int>()) + float2(0.5f);
 		}
+		carPosition = worldStartingPosition;
 	}
 
 	float2 getRenderTileSize() const {
@@ -433,7 +444,7 @@ struct Session {
 			if (ImGui::CollapsingHeader("Car", ImGuiTreeNodeFlags_DefaultOpen)) {
 				ImGui::SetNextItemShortcut(ImGuiMod_Ctrl | ImGuiKey_H);
 				if (ImGui::Button("Return Home")) {
-					carPosition = {0.5f, 0.5f};
+					carPosition = worldStartingPosition;
 					carForwardDirection = {1, 0};
 					carSteerDirection = {1, 0};
 					carSkid = false;
@@ -612,7 +623,7 @@ struct Session {
 				carPerks.emplace_back(CarPerk{.durationLeft = std::chrono::microseconds(unsigned int(building_settings->perkDuration * 1000000)),
 											  .destructiveness = building_settings->perkDestructiveness});
 				carSuperSpeedDuration += std::chrono::microseconds(unsigned int(building_settings->superSpeedDuration * 1000000));
-				cameraShaker.shake();
+				cameraShaker.shake(building_settings->shake);
 			} else {
 				bouncing = true;
 			}
