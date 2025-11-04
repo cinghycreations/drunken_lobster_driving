@@ -22,6 +22,16 @@
 using float2 = glm::vec2;
 using int2 = glm::ivec2;
 
+struct TimeUtils {
+	static float microsecondsToFloatSeconds(const std::chrono::microseconds microseconds) {
+		return float(microseconds.count()) / 1000000;
+	}
+
+	static std::chrono::microseconds floatSecondsToMicroseconds(const float seconds) {
+		return std::chrono::microseconds(std::chrono::microseconds::rep(seconds * 1000000));
+	}
+};
+
 class Storage {
 public:
 	bool exists(const std::filesystem::path& path) const {
@@ -218,7 +228,7 @@ struct Content {
 class CameraShaker {
 public:
 	void shake(const ShakeSettings& shake_settings) {
-		maxDuration = std::chrono::microseconds(std::chrono::microseconds::rep(1000000 * shake_settings.shakeTime));
+		maxDuration = TimeUtils::floatSecondsToMicroseconds(shake_settings.shakeTime);
 		durationLeft = maxDuration;
 		period = shake_settings.shakePeriod;
 		strength = shake_settings.shakeStrength;
@@ -227,7 +237,7 @@ public:
 	void update(const std::chrono::microseconds& delta_time) {
 		if (durationLeft >= delta_time) {
 			durationLeft -= delta_time;
-			const float time_secs = float(durationLeft.count()) / float(1000000);
+			const float time_secs = TimeUtils::microsecondsToFloatSeconds(durationLeft);
 			const float progress = float(durationLeft.count()) / float(maxDuration.count());
 			const float2 delta = shakeSinusoidal(time_secs, period) * strength;
 			movement = glm::lerp(float2(0), delta, progress);
@@ -507,11 +517,11 @@ struct Session {
 			ImGui::Text("Speed: %f", car_stats.speed);
 			ImGui::Text("Super Speed Duration: %d", carSuperSpeedDuration.count());
 			ImGui::Text("Perks: %d", carPerks.size());
-			ImGui::Text("Session Time: %.2fs", float(sessionTime.count()) / 1000000);
+			ImGui::Text("Session Time: %.2fs", TimeUtils::microsecondsToFloatSeconds(sessionTime));
 			if (!finishTime.has_value()) {
 				ImGui::Text("Finish Time: none");
 			} else {
-				ImGui::Text("Finish Time: %.2fs", float(finishTime->count()) / 1000000);
+				ImGui::Text("Finish Time: %.2fs", TimeUtils::microsecondsToFloatSeconds(*finishTime));
 			}
 			ImGui::EndDisabled();
 		}
@@ -552,7 +562,7 @@ struct Session {
 		const float steer_angle = mouse_delta_x * settings.car.mouseSensibility;
 		carSteerDirection = glm::rotate(glm::normalize(carSteerDirection), steer_angle);
 
-		const float delta_secs = float(delta_time.count()) / 1000000;
+		const float delta_secs = TimeUtils::microsecondsToFloatSeconds(delta_time);
 		const float wanted_angle = glm::orientedAngle(carForwardDirection, carSteerDirection);
 		const float max_angle = glm::radians(settings.car.grip * 360) * delta_secs;
 		carSkid = std::fabs(wanted_angle) >= max_angle;
@@ -620,9 +630,9 @@ struct Session {
 			if (stats.destructiveness >= building_settings->minDestructivenessToDestroy && stats.speed >= building_settings->minSpeedToDestroy) {
 				cell.destructed = true;
 				cell.destructionTime = game_time;
-				carPerks.emplace_back(CarPerk{.durationLeft = std::chrono::microseconds(unsigned int(building_settings->perkDuration * 1000000)),
-											  .destructiveness = building_settings->perkDestructiveness});
-				carSuperSpeedDuration += std::chrono::microseconds(unsigned int(building_settings->superSpeedDuration * 1000000));
+				carPerks.emplace_back(
+					CarPerk{.durationLeft = TimeUtils::floatSecondsToMicroseconds(building_settings->perkDuration), .destructiveness = building_settings->perkDestructiveness});
+				carSuperSpeedDuration += TimeUtils::floatSecondsToMicroseconds(building_settings->superSpeedDuration);
 				cameraShaker.shake(building_settings->shake);
 			} else {
 				bouncing = true;
