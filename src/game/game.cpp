@@ -20,6 +20,7 @@
 #include <tileson.hpp>
 
 using float2 = glm::vec2;
+using float4 = glm::vec4;
 using int2 = glm::ivec2;
 
 struct TimeUtils {
@@ -77,6 +78,14 @@ struct CameraSettings {
 	NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(CameraSettings, zoom);
 };
 
+struct RenderSettings {
+	int skidTileResolution = 256;
+	float4 skidColor = float4{0.5f};
+	float skidSize = 2;
+
+	NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(RenderSettings, skidTileResolution, skidColor, skidSize);
+};
+
 struct CarSettings {
 	float size = 0.2f;
 	float baseSpeed = 0.1f;
@@ -111,6 +120,7 @@ struct GameplaySettings {
 };
 
 struct Settings {
+	RenderSettings render;
 	CameraSettings camera;
 	CarSettings car;
 	GameplaySettings gameplay;
@@ -127,6 +137,12 @@ struct Settings {
 			if (ImGui::Button("Save")) {
 				const nlohmann::json json = *this;
 				storage.saveJson("settings.json", json);
+			}
+
+			if (ImGui::CollapsingHeader("Render", ImGuiTreeNodeFlags_DefaultOpen)) {
+				ImGui::DragInt("Skid Tile Resolution", &render.skidTileResolution, 1, 32, 512);
+				ImGui::ColorEdit4("Skid Color", &render.skidColor.r);
+				ImGui::DragFloat("Skid Size", &render.skidSize, 0.01f);
 			}
 
 			if (ImGui::CollapsingHeader("Camera", ImGuiTreeNodeFlags_DefaultOpen)) {
@@ -284,6 +300,7 @@ struct Session {
 		BuildingType buildingType;
 		bool destructed;
 		std::chrono::microseconds destructionTime;
+		SDL_Texture* skidTexture;
 	};
 
 	struct CarPerk {
@@ -352,8 +369,12 @@ struct Session {
 			for (int i = 0; i < worldSize.y; ++i) {
 				for (int j = 0; j < worldSize.x; ++j) {
 					CellState& cell = cells.at(i * worldSize.x + j);
-					cell =
-						CellState{.groundTile = -1, .buildingTile = -1, .buildingType = BuildingType::None, .destructed = false, .destructionTime = std::chrono::microseconds(0)};
+					cell = CellState{.groundTile = -1,
+									 .buildingTile = -1,
+									 .buildingType = BuildingType::None,
+									 .destructed = false,
+									 .destructionTime = std::chrono::microseconds(0),
+									 .skidTexture = nullptr};
 
 					{
 						SDL_assert(ground_layer->getTileData().count({j, i}));
@@ -388,6 +409,24 @@ struct Session {
 							SDL_assert(false);
 						}
 					}
+
+					{
+						cell.skidTexture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET, settings.render.skidTileResolution,
+															 settings.render.skidTileResolution / 2);
+						SDL_assert(cell.skidTexture);
+
+						const bool set_target_ok = SDL_SetRenderTarget(renderer, cell.skidTexture);
+						SDL_assert(set_target_ok);
+
+						const bool set_color_ok = SDL_SetRenderDrawColor(renderer, 0, 0, 0, 0);
+						SDL_assert(set_color_ok);
+
+						const bool clear_ok = SDL_RenderClear(renderer);
+						SDL_assert(clear_ok);
+
+						const bool restore_target_ok = SDL_SetRenderTarget(renderer, nullptr);
+						SDL_assert(restore_target_ok);
+					}
 				}
 			}
 		}
@@ -396,6 +435,13 @@ struct Session {
 			worldStartingPosition = float2(level->getProp("startX")->getValue<int>(), level->getProp("startY")->getValue<int>()) + float2(0.5f);
 		}
 		carPosition = worldStartingPosition;
+	}
+
+	~Session() {
+		for (auto& cell : cells) {
+			SDL_DestroyTexture(cell.skidTexture);
+			cell.skidTexture = nullptr;
+		}
 	}
 
 	float2 getRenderTileSize() const {
@@ -575,6 +621,38 @@ struct Session {
 		carSkid = std::fabs(wanted_angle) >= max_angle;
 		carForwardDirection = glm::rotate(carForwardDirection, std::clamp(wanted_angle, -max_angle, max_angle));
 		carPosition += carForwardDirection * car_stats.speed * delta_secs;
+
+		if (carSkid) {
+			const int2 car_tile = carPosition;
+			CellState& cell = cells.at(car_tile.y * worldSize.x + car_tile.x);
+
+			const bool set_target_ok = SDL_SetRenderTarget(renderer, cell.skidTexture);
+			SDL_assert(set_target_ok);
+
+			const bool set_color_ok =
+				SDL_SetRenderDrawColorFloat(renderer, settings.render.skidColor.r, settings.render.skidColor.g, settings.render.skidColor.b, settings.render.skidColor.a);
+			SDL_assert(set_color_ok);
+
+			for (const float2 wheel_delta : {float2(-0.25f, 0.1f), float2(-0.25f, -0.1f)}) {
+				const float2 wheels_position = carPosition + carForwardDirection * settings.car.size * wheel_delta.x +
+											   glm::rotate(carForwardDirection, glm::radians<float>(90)) * settings.car.size * wheel_delta.y;
+
+				const float2 tile_topright = worldToRender(float2(car_tile) + float2(0.5f) - float2(1, 0));
+				const float2 tile_bottomleft = worldToRender(float2(car_tile) + float2(0.5f) + float2(1, 0));
+				const float2 skid_position = worldToRender(wheels_position);
+				const float2 skid_position_in_tile = (skid_position - tile_topright) / (tile_bottomleft - tile_topright) * float2(cell.skidTexture->w, cell.skidTexture->h);
+				const SDL_FRect skid_rect{.x = skid_position_in_tile.x - settings.render.skidSize / 2,
+										  .y = skid_position_in_tile.y - settings.render.skidSize / 2,
+										  .w = settings.render.skidSize,
+										  .h = settings.render.skidSize};
+
+				const bool render_rect_ok = SDL_RenderFillRect(renderer, &skid_rect);
+				SDL_assert(render_rect_ok);
+			}
+
+			const bool restore_target_ok = SDL_SetRenderTarget(renderer, nullptr);
+			SDL_assert(restore_target_ok);
+		}
 	}
 
 	void updateCarCollisions(const std::chrono::microseconds game_time, const CarStats& stats) {
@@ -693,6 +771,15 @@ struct Session {
 				const CellState& cell = cells.at(i * worldSize.x + j);
 				SDL_Texture* ground_texture = content.groundFlipbook.textures.at(cell.groundTile);
 				renderEntity(float2(j, i) + float2(0.5f), 1, ground_texture, renderer);
+			}
+		}
+
+		//---------- Skids ----------//
+
+		for (int i = 0; i < worldSize.y; ++i) {
+			for (int j = 0; j < worldSize.x; ++j) {
+				const CellState& cell = cells.at(i * worldSize.x + j);
+				renderEntity(float2(j, i) + float2(0.5f), 1, cell.skidTexture, renderer);
 			}
 		}
 
