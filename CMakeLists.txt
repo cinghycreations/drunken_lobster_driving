@@ -22,11 +22,16 @@ set( SDLIMAGE_WEBP OFF )
 set( SDLIMAGE_XCF OFF )
 set( SDLIMAGE_XPM OFF )
 set( SDLIMAGE_XV OFF )
+set( RMLUI_BACKEND "SDL_SDLrenderer" )
 add_subdirectory( ext/SDL EXCLUDE_FROM_ALL )
 add_subdirectory( ext/SDL_image EXCLUDE_FROM_ALL )
 add_subdirectory( ext/glm EXCLUDE_FROM_ALL )
 add_subdirectory( ext/json EXCLUDE_FROM_ALL )
 add_subdirectory( ext/fmt EXCLUDE_FROM_ALL )
+add_subdirectory( ext/freetype EXCLUDE_FROM_ALL )
+
+add_library( Freetype::Freetype ALIAS freetype )
+add_subdirectory( ext/RmlUi EXCLUDE_FROM_ALL )
 
 add_library( ImGui
 	ext/imgui/imconfig.h
@@ -56,7 +61,12 @@ target_link_libraries( ImGuiBackend PUBLIC ImGui SDL3-static )
 add_library( tileson INTERFACE )
 target_include_directories( tileson INTERFACE ext/tileson )
 
+add_library( RmlUiBackend ext/RmlUi/Backends/RmlUi_Platform_SDL.cpp ext/RmlUi/Backends/RmlUi_Renderer_SDL.cpp )
+target_compile_definitions( RmlUiBackend PUBLIC RMLUI_SDL_VERSION_MAJOR=3 )
+target_include_directories( RmlUiBackend PUBLIC ext/RmlUi/Backends )
+target_link_libraries( RmlUiBackend PUBLIC RmlUi::RmlUi SDL3-static SDL3_image-static )
+
 add_executable( game src/game/game.cpp )
 target_include_directories( game PUBLIC src/game )
 target_compile_definitions( game PUBLIC GLM_ENABLE_EXPERIMENTAL SDL_ASSERT_LEVEL=2 )
-target_link_libraries( game PUBLIC SDL_uclibc SDL3-static SDL3_image-static fmt glm nlohmann_json ImGui ImGuiBackend tileson )
+target_link_libraries( game PUBLIC SDL_uclibc SDL3-static SDL3_image-static fmt glm nlohmann_json ImGuiBackend tileson RmlUiBackend )

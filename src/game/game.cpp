@@ -1,4 +1,8 @@
 #define SDL_MAIN_USE_CALLBACKS
+#include <RmlUi/Core.h>
+#include <RmlUi/Debugger.h>
+#include <RmlUi_Platform_SDL.h>
+#include <RmlUi_Renderer_SDL.h>
 #include <SDL3/SDL_assert.h>
 #include <SDL3/SDL_main.h>
 #include <SDL3/SDL_render.h>
@@ -882,13 +886,35 @@ struct Session {
 	}
 };
 
+struct Launcher {
+	Rml::Context* uiContext;
+	Rml::ElementDocument* document = nullptr;
+
+	Launcher(Rml::Context* ui_context) : uiContext(ui_context) {
+		document = uiContext->LoadDocument("ui/loading.rml");
+		SDL_assert(document);
+
+		document->Show();
+	}
+
+	~Launcher() {
+		uiContext->UnloadDocument(document);
+		document = nullptr;
+	}
+};
+
 struct App {
 	SDL_Window* window = nullptr;
 	SDL_Renderer* renderer = nullptr;
 	std::unique_ptr<Storage> storage;
 	Settings settings;
+	std::unique_ptr<SystemInterface_SDL> uiSystem;
+	std::unique_ptr<RenderInterface_SDL> uiRenderer;
+	Rml::Context* uiContext;
+	std::unique_ptr<Launcher> launcher;
 	std::unique_ptr<Content> content;
 	std::unique_ptr<Session> session;
+
 	bool showDebugUi = false;
 	std::chrono::microseconds currentTime;
 	std::chrono::microseconds deltaTime;
@@ -899,7 +925,7 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[]) {
 	SDL_assert(init_ok);
 
 	App* app = new App;
-	app->window = SDL_CreateWindow("Drunken Lobser Driving", 1920, 1080, SDL_WINDOW_RESIZABLE | SDL_WINDOW_MAXIMIZED | SDL_WINDOW_HIGH_PIXEL_DENSITY);
+	app->window = SDL_CreateWindow("Drunken Lobster Driving", 1920, 1080, SDL_WINDOW_RESIZABLE | SDL_WINDOW_MAXIMIZED | SDL_WINDOW_HIGH_PIXEL_DENSITY);
 	SDL_assert(app->window);
 
 	app->renderer = SDL_CreateRenderer(app->window, nullptr);
@@ -935,6 +961,26 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[]) {
 		app->settings = json;
 	}
 
+	{
+		app->uiSystem.reset(new SystemInterface_SDL);
+		app->uiRenderer.reset(new RenderInterface_SDL(app->renderer));
+		Rml::SetSystemInterface(app->uiSystem.get());
+		Rml::SetRenderInterface(app->uiRenderer.get());
+
+		const bool ui_initialize_ok = Rml::Initialise();
+		SDL_assert(ui_initialize_ok);
+
+		app->uiContext = Rml::CreateContext("RmlContext", Rml::Vector2i(1920, 1080));
+		SDL_assert(app->uiContext);
+
+		const bool debugger_init_ok = Rml::Debugger::Initialise(app->uiContext);
+		SDL_assert(debugger_init_ok);
+
+		const bool load_font_ok = Rml::LoadFontFace("fonts/NotoSans-Regular.ttf", true);
+		SDL_assert(load_font_ok);
+	}
+
+	app->launcher.reset(new Launcher(app->uiContext));
 	app->content.reset(new Content(*app->storage, app->renderer));
 	app->session.reset(new Session(app->settings, *app->content, app->window, app->renderer, "levels/testbed.tmj"));
 	app->currentTime = std::chrono::microseconds(SDL_GetTicksNS() / 1000);
@@ -949,6 +995,7 @@ SDL_AppResult SDL_AppEvent(void* appstate, SDL_Event* event) {
 	if (app->showDebugUi) {
 		ImGui_ImplSDL3_ProcessEvent(event);
 	}
+	RmlSDL::InputEventHandler(app->uiContext, app->window, *event);
 
 	if (event->type == SDL_EVENT_QUIT) {
 		return SDL_APP_SUCCESS;
@@ -957,6 +1004,8 @@ SDL_AppResult SDL_AppEvent(void* appstate, SDL_Event* event) {
 		ImGui::GetStyle().FontScaleDpi = main_scale;
 	} else if (event->type == SDL_EVENT_KEY_DOWN && event->key.scancode == SDL_SCANCODE_F1) {
 		app->showDebugUi = !app->showDebugUi;
+	} else if (event->type == SDL_EVENT_KEY_DOWN && event->key.scancode == SDL_SCANCODE_F12) {
+		Rml::Debugger::SetVisible(!Rml::Debugger::IsVisible());
 	}
 
 	return SDL_APP_CONTINUE;
@@ -985,6 +1034,14 @@ SDL_AppResult SDL_AppIterate(void* appstate) {
 
 	app->session->render();
 
+	{
+		const bool ui_update_ok = app->uiContext->Update();
+		SDL_assert(ui_update_ok);
+
+		const bool ui_render_ok = app->uiContext->Render();
+		SDL_assert(ui_render_ok);
+	}
+
 	ImGui::Render();
 	if (app->showDebugUi) {
 		ImGui_ImplSDLRenderer3_RenderDrawData(ImGui::GetDrawData(), app->renderer);
@@ -1001,6 +1058,12 @@ void SDL_AppQuit(void* appstate, SDL_AppResult result) {
 
 	app->session.reset();
 	app->content.reset();
+	app->launcher.reset();
+
+	Rml::Shutdown();
+	app->uiRenderer.reset();
+	app->uiSystem.reset();
+
 	app->storage.reset();
 
 	ImGui_ImplSDLRenderer3_Shutdown();
