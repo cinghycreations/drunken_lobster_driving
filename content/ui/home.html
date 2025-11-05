@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Home</title>
+    <link rel="stylesheet" type="text/css" href="/ui/common.css" />
+    <style>
+        body {
+            display: flex;
+            flex-direction: column;
+        }
+
+        main {
+            display: flex;
+            flex: 1;
+            justify-content: center;
+            align-items: center;
+        }
+
+        footer {
+            display: flex;
+            justify-content: space-between;
+        }
+
+        languages {
+            display: flex;
+            padding: 10px;
+            gap: 10px;
+        }
+
+        panel {
+            width: 500px;
+            padding: 10px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        panel>p {
+            font-size: 60px;
+            text-align: center;
+        }
+
+        panel>input[type=button] {
+            margin: 5px;
+        }
+
+        img {
+            padding: 5px;
+            width: 40px;
+            height: 40px;
+        }
+
+        img {
+            border: 2px solid dodgerblue;
+            border-radius: 10px;
+            background-color: moccasin;
+        }
+
+        img:hover {
+            background-color: gold;
+        }
+    </style>
+</head>
+
+<body>
+    <main>
+        <panel>
+            <p>Drunken Lobster Driving</p>
+            <input type="button" value="How to Play" />
+            <input type="button" value="Drive!" />
+            <input type="button" value="Records" />
+            <input type="button" value="Options" />
+            <input type="button" value="Credits" />
+            <input type="button" value="Quit" />
+        </panel>
+    </main>
+    <footer>
+        <copyright>
+            <p>{{buildVersion}} built on {{buildDate}}</p>
+        </copyright>
+        <languages>
+            <img src="/ui/italy.png" />
+            <img src="/ui/uk.png" />
+            <img src="/ui/spain.png" />
+        </languages>
+    </footer>
+</body>
+
+</html>
