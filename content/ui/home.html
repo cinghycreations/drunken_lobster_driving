@@ -24,40 +24,43 @@
 
         languages {
             display: flex;
-            padding: 10px;
-            gap: 10px;
+            padding: 0.5rem;
+            gap: 0.5rem;
         }
 
         panel {
-            width: 500px;
-            padding: 10px;
+            width: 20rem;
+            padding: 0.5rem;
             display: flex;
             flex-direction: column;
         }
 
         panel>p {
-            font-size: 60px;
+            font-size: 3rem;
             text-align: center;
+            margin: 2rem 0rem;
         }
 
-        panel>input[type=button] {
-            margin: 5px;
-        }
-
-        img {
-            padding: 5px;
-            width: 40px;
-            height: 40px;
+        panel>button {
+            margin: 0.25rem;
         }
 
         img {
-            border: 2px solid dodgerblue;
-            border-radius: 10px;
-            background-color: moccasin;
+            padding: 0.25rem;
+            width: 2rem;
+            height: 2rem;
+        }
+
+        img {
+            border-width: 0.1rem;
+            border-style: solid;
+            border-color: #1e90ff;
+            border-radius: 0.5rem;
+            background-color: #ffe4b5;
         }
 
         img:hover {
-            background-color: gold;
+            background-color: #ffd700;
         }
     </style>
 </head>
@@ -66,12 +69,12 @@
     <main>
         <panel>
             <p>Drunken Lobster Driving</p>
-            <input type="button" value="How to Play" data-event-click="goToHowToPlay()" />
-            <input type="button" value="Drive!" data-event-click="goToDrive()" />
-            <input type="button" value="Records" />
-            <input type="button" value="Options" />
-            <input type="button" value="Credits" data-event-click="goToCredits()" />
-            <input type="button" value="Quit" data-event-click="quit()" />
+            <button data-event-click="goToHowToPlay()">How to Play</button>
+            <button data-event-click="goToDrive()">Drive</button>
+            <button >Records</button>
+            <button >Options</button>
+            <button data-event-click="goToCredits()">Credits</button>
+            <button data-event-click="quit()">Quit</button>
         </panel>
     </main>
     <footer>
@@ -79,9 +82,9 @@
             <p>{{buildVersion}} built on {{buildDate}}</p>
         </copyright>
         <languages>
-            <img src="/ui/italy.png" />
-            <img src="/ui/uk.png" />
-            <img src="/ui/spain.png" />
+            <img src="/ui/italy.png" data-event-click="selectLanguageItalian()"/>
+            <img src="/ui/uk.png" data-event-click="selectLanguageEnglish()"/>
+            <img src="/ui/spain.png" data-event-click="selectLanguageSpanish()" />
         </languages>
     </footer>
 </body>

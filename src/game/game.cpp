@@ -891,7 +891,7 @@ struct Launcher {
 	Rml::ElementDocument* document = nullptr;
 
 	Launcher(Rml::Context* ui_context) : uiContext(ui_context) {
-		document = uiContext->LoadDocument("ui/loading.rml");
+		document = uiContext->LoadDocument("ui/home.html");
 		SDL_assert(document);
 
 		document->Show();
@@ -976,8 +976,11 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[]) {
 		const bool debugger_init_ok = Rml::Debugger::Initialise(app->uiContext);
 		SDL_assert(debugger_init_ok);
 
-		const bool load_font_ok = Rml::LoadFontFace("fonts/NotoSans-Regular.ttf", true);
-		SDL_assert(load_font_ok);
+		const bool load_font1_ok = Rml::LoadFontFace("fonts/NotoSans-Regular.ttf", true);
+		SDL_assert(load_font1_ok);
+
+		const bool load_font2_ok = Rml::LoadFontFace("fonts/Lobster-Regular.ttf", true);
+		SDL_assert(load_font2_ok);
 	}
 
 	app->launcher.reset(new Launcher(app->uiContext));
