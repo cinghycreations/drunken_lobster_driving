@@ -35,6 +35,18 @@ struct TimeUtils {
 	static std::chrono::microseconds floatSecondsToMicroseconds(const float seconds) {
 		return std::chrono::microseconds(std::chrono::microseconds::rep(seconds * 1000000));
 	}
+
+	static std::string microsecondsToString(const std::chrono::microseconds microseconds) {
+		using rep = std::chrono::microseconds::rep;
+		static constexpr rep us_in_minute = 1000 * 1000 * 60;
+		static constexpr rep us_in_second = 1000 * 1000;
+		static constexpr rep us_in_milli = 1000;
+		const rep us = microseconds.count();
+		const rep mins = us / us_in_minute;
+		const rep secs = (us % us_in_minute) / us_in_second;
+		const rep millis = (us % us_in_second) / us_in_milli;
+		return fmt::format("{}:{}.{}", mins, secs, millis);
+	}
 };
 
 class Storage {
@@ -101,16 +113,15 @@ struct CarSettings {
 };
 
 struct BuildingSettings {
-	float minDestructivenessToDestroy = 0;
+	float minMayhemToDestroy = 0;
 	float minSpeedToDestroy = 0;
 	float perkDuration = 0;
-	float perkDestructiveness = 0;
+	float perkMayhem = 0;
 	float superSpeedDuration = 0;
-	float mayhemMultiplier = 1;
+	float scoreMultiplier = 1;
 	ShakeSettings shake;
 
-	NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(BuildingSettings, minDestructivenessToDestroy, minSpeedToDestroy, perkDestructiveness, perkDuration, superSpeedDuration,
-												mayhemMultiplier, shake);
+	NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(BuildingSettings, minMayhemToDestroy, minSpeedToDestroy, perkMayhem, perkDuration, superSpeedDuration, scoreMultiplier, shake);
 };
 
 struct GameplaySettings {
@@ -173,11 +184,12 @@ struct Settings {
 				for (const auto& entry : entries) {
 					ImGui::PushID(entry.first);
 					ImGui::Text("%s", entry.first);
-					ImGui::DragFloat("Min Destructiveness To Destroy", &entry.second->minDestructivenessToDestroy, 0.01f);
+					ImGui::DragFloat("Min Mayhem To Destroy", &entry.second->minMayhemToDestroy, 0.01f);
 					ImGui::DragFloat("Min Speed To Destroy", &entry.second->minSpeedToDestroy, 0.01f);
 					ImGui::DragFloat("Perk Duration", &entry.second->perkDuration, 0.01f);
-					ImGui::DragFloat("Perk Destructiveness", &entry.second->perkDestructiveness, 0.01f);
+					ImGui::DragFloat("Perk Mayhem", &entry.second->perkMayhem, 0.01f);
 					ImGui::DragFloat("SuperSpeed Duration", &entry.second->superSpeedDuration, 0.01f);
+					ImGui::DragFloat("Score Multiplier", &entry.second->scoreMultiplier, 0.01f);
 					ImGui::DragFloat("Shake Time", &entry.second->shake.shakeTime, 0.01f);
 					ImGui::DragFloat("Shake Period", &entry.second->shake.shakePeriod, 0.01f);
 					ImGui::DragFloat("Shake Strength", &entry.second->shake.shakeStrength, 0.01f);
@@ -309,11 +321,11 @@ struct Session {
 
 	struct CarPerk {
 		std::chrono::microseconds durationLeft;
-		float destructiveness;
+		float mayhem;
 	};
 
 	struct CarStats {
-		float destructiveness;
+		float mayhem;
 		float speed;
 	};
 
@@ -344,7 +356,7 @@ struct Session {
 	std::chrono::microseconds sessionTime;
 	std::optional<std::chrono::microseconds> finishTime;
 	bool paused = false;
-	float mayhem = 0;
+	float score = 0;
 
 	Session(const Settings& _settings, const Content& _content, SDL_Window* _window, SDL_Renderer* _renderer, const std::filesystem::path& level_path)
 		: settings(_settings), content(_content), window(_window), renderer(_renderer), sessionTime(0) {
@@ -519,7 +531,7 @@ struct Session {
 					}
 					sessionTime = std::chrono::microseconds(0);
 					finishTime.reset();
-					mayhem = 0;
+					score = 0;
 				}
 				ImGui::SameLine();
 				ImGui::SetNextItemShortcut(ImGuiMod_Ctrl | ImGuiKey_D);
@@ -541,7 +553,7 @@ struct Session {
 
 		//---------- Car ----------//
 
-		CarStats car_stats{.destructiveness = 0, .speed = 0};
+		CarStats car_stats{.mayhem = 0, .speed = 0};
 
 		if (!paused) {
 			if (debug_simulation) {
@@ -569,7 +581,7 @@ struct Session {
 
 		if (ImGui::Begin("Car Stats")) {
 			ImGui::BeginDisabled(paused);
-			ImGui::Text("Destructiveness: %f", car_stats.destructiveness);
+			ImGui::Text("Mayhem: %f", car_stats.mayhem);
 			ImGui::Text("Speed: %f", car_stats.speed);
 			ImGui::Text("Super Speed Duration: %d", carSuperSpeedDuration.count());
 			ImGui::Text("Perks: %d", carPerks.size());
@@ -579,7 +591,7 @@ struct Session {
 			} else {
 				ImGui::Text("Finish Time: %.2fs", TimeUtils::microsecondsToFloatSeconds(*finishTime));
 			}
-			ImGui::Text("Mayhem: %f", mayhem);
+			ImGui::Text("Score: %f", score);
 			ImGui::EndDisabled();
 		}
 		ImGui::End();
@@ -588,13 +600,13 @@ struct Session {
 	CarStats updateCarPerks(const std::chrono::microseconds delta_time) {
 		CarStats stats;
 
-		stats.destructiveness = 0;
+		stats.mayhem = 0;
 		for (auto perk_iter = carPerks.begin(); perk_iter != carPerks.end();) {
 			if (perk_iter->durationLeft < delta_time) {
 				perk_iter = carPerks.erase(perk_iter);
 			} else {
 				perk_iter->durationLeft -= delta_time;
-				stats.destructiveness += perk_iter->destructiveness;
+				stats.mayhem += perk_iter->mayhem;
 				++perk_iter;
 			}
 		}
@@ -716,15 +728,14 @@ struct Session {
 				building_settings = &settings.gameplay.nuclear;
 			}
 
-			if (stats.destructiveness >= building_settings->minDestructivenessToDestroy && stats.speed >= building_settings->minSpeedToDestroy) {
+			if (stats.mayhem >= building_settings->minMayhemToDestroy && stats.speed >= building_settings->minSpeedToDestroy) {
 				cell.destructed = true;
 				cell.destructionTime = game_time;
-				carPerks.emplace_back(
-					CarPerk{.durationLeft = TimeUtils::floatSecondsToMicroseconds(building_settings->perkDuration), .destructiveness = building_settings->perkDestructiveness});
+				carPerks.emplace_back(CarPerk{.durationLeft = TimeUtils::floatSecondsToMicroseconds(building_settings->perkDuration), .mayhem = building_settings->perkMayhem});
 				carSuperSpeedDuration += TimeUtils::floatSecondsToMicroseconds(building_settings->superSpeedDuration);
 				cameraShaker.shake(building_settings->shake);
 
-				mayhem += stats.destructiveness * stats.speed * building_settings->mayhemMultiplier;
+				score += stats.mayhem * stats.speed * building_settings->scoreMultiplier;
 			} else {
 				bouncing = true;
 			}
@@ -892,6 +903,14 @@ struct Session {
 	bool isPaused() const {
 		return paused;
 	}
+
+	std::chrono::microseconds getSessionTime() {
+		return sessionTime;
+	}
+
+	int getScore() const {
+		return score;
+	}
 };
 
 class Launcher {
@@ -923,6 +942,10 @@ public:
 			session_model_ctor.BindEventCallback("pauseSession", &Launcher::pauseSession, this);
 			session_model_ctor.BindEventCallback("resumeSession", &Launcher::resumeSession, this);
 			session_model_ctor.BindEventCallback("exitSession", &Launcher::exitSession, this);
+			session_model_ctor.Bind("mayhem", &mayhem);
+			session_model_ctor.Bind("speed", &speed);
+			session_model_ctor.Bind("time", &time);
+			session_model_ctor.Bind("score", &score);
 			sessionModel = session_model_ctor.GetModelHandle();
 		}
 
@@ -939,6 +962,12 @@ public:
 
 		if (session) {
 			session->update(delta_real_time);
+
+			score = session->getScore();
+			sessionModel.DirtyVariable("score");
+
+			time = TimeUtils::microsecondsToString(session->getSessionTime());
+			sessionModel.DirtyVariable("time");
 		}
 	}
 
@@ -965,6 +994,10 @@ private:
 	Rml::DataModelHandle sessionModel;
 	std::string buildVersion = "v0";
 	std::string buildDate = __DATE__ " " __TIME__;
+	int mayhem = 0;
+	int speed = 0;
+	std::string time;
+	int score = 0;
 
 	Rml::ElementDocument* document = nullptr;
 
