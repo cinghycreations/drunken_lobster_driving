@@ -886,20 +886,109 @@ struct Session {
 	}
 };
 
-struct Launcher {
-	Rml::Context* uiContext;
-	Rml::ElementDocument* document = nullptr;
-
+class Launcher {
+public:
 	Launcher(Rml::Context* ui_context) : uiContext(ui_context) {
+		{
+			Rml::DataModelConstructor launcher_model_ctor = uiContext->CreateDataModel("launcher");
+			launcher_model_ctor.BindEventCallback("selectLanguageItalian", &Launcher::selectLanguageItalian, this);
+			launcher_model_ctor.BindEventCallback("selectLanguageEnglish", &Launcher::selectLanguageEnglish, this);
+			launcher_model_ctor.BindEventCallback("selectLanguageSpanish", &Launcher::selectLanguageSpanish, this);
+			launcher_model_ctor.BindEventCallback("goToHowToPlay", &Launcher::goToHowToPlay, this);
+			launcher_model_ctor.BindEventCallback("goToDrive", &Launcher::goToDrive, this);
+			launcher_model_ctor.BindEventCallback("goToCredits", &Launcher::goToCredits, this);
+			launcher_model_ctor.BindEventCallback("goToHome", &Launcher::goToHome, this);
+			launcher_model_ctor.BindEventCallback("quit", &Launcher::quit, this);
+			launcher_model_ctor.Bind("buildVersion", &buildVersion);
+			launcher_model_ctor.Bind("buildDate", &buildDate);
+			launcherModel = launcher_model_ctor.GetModelHandle();
+		}
+
+		{
+			Rml::DataModelConstructor session_model_ctor = uiContext->CreateDataModel("session");
+			session_model_ctor.BindEventCallback("pauseSession", &Launcher::pauseSession, this);
+			session_model_ctor.BindEventCallback("resumeSession", &Launcher::resumeSession, this);
+			session_model_ctor.BindEventCallback("exitSession", &Launcher::exitSession, this);
+			sessionModel = session_model_ctor.GetModelHandle();
+		}
+
 		document = uiContext->LoadDocument("ui/home.html");
 		SDL_assert(document);
-
 		document->Show();
 	}
 
+	void update(const std::chrono::microseconds delta_real_time) {
+		if (nextDocument.has_value()) {
+			if (document) {
+				uiContext->UnloadDocument(document);
+				document = nullptr;
+			}
+
+			document = uiContext->LoadDocument(*nextDocument);
+			SDL_assert(document);
+			document->Show();
+
+			nextDocument.reset();
+		}
+	}
+
+	bool isShutdownRequested() const {
+		return shutdownRequested;
+	}
+
 	~Launcher() {
-		uiContext->UnloadDocument(document);
-		document = nullptr;
+		if (document) {
+			uiContext->UnloadDocument(document);
+			document = nullptr;
+		}
+	}
+
+private:
+	Rml::Context* uiContext;
+	Rml::DataModelHandle launcherModel;
+	Rml::DataModelHandle sessionModel;
+	std::string buildVersion = "v0";
+	std::string buildDate = __DATE__ " " __TIME__;
+
+	Rml::ElementDocument* document = nullptr;
+	std::optional<std::string> nextDocument;
+
+	bool shutdownRequested = false;
+
+	void selectLanguageItalian(Rml::DataModelHandle handle, Rml::Event& event, const Rml::VariantList& params) {}
+	void selectLanguageEnglish(Rml::DataModelHandle handle, Rml::Event& event, const Rml::VariantList& params) {}
+	void selectLanguageSpanish(Rml::DataModelHandle handle, Rml::Event& event, const Rml::VariantList& params) {}
+
+	void goToHowToPlay(Rml::DataModelHandle handle, Rml::Event& event, const Rml::VariantList& params) {
+		nextDocument = "ui/howto.html";
+	}
+
+	void goToDrive(Rml::DataModelHandle handle, Rml::Event& event, const Rml::VariantList& params) {
+		nextDocument = "ui/ingame.html";
+	}
+
+	void goToCredits(Rml::DataModelHandle handle, Rml::Event& event, const Rml::VariantList& params) {
+		nextDocument = "ui/credits.html";
+	}
+
+	void goToHome(Rml::DataModelHandle handle, Rml::Event& event, const Rml::VariantList& params) {
+		nextDocument = "ui/home.html";
+	}
+
+	void quit(Rml::DataModelHandle handle, Rml::Event& event, const Rml::VariantList& params) {
+		shutdownRequested = true;
+	}
+
+	void pauseSession(Rml::DataModelHandle handle, Rml::Event& event, const Rml::VariantList& params) {
+		nextDocument = "ui/pause.html";
+	}
+
+	void resumeSession(Rml::DataModelHandle handle, Rml::Event& event, const Rml::VariantList& params) {
+		nextDocument = "ui/ingame.html";
+	}
+
+	void exitSession(Rml::DataModelHandle handle, Rml::Event& event, const Rml::VariantList& params) {
+		nextDocument = "ui/home.html";
 	}
 };
 
@@ -1027,6 +1116,7 @@ SDL_AppResult SDL_AppIterate(void* appstate) {
 	ImGui::DockSpaceOverViewport(0, nullptr, ImGuiDockNodeFlags_PassthruCentralNode);
 
 	app->settings.update(*app->storage);
+	app->launcher->update(app->deltaTime);
 	app->session->update(app->deltaTime);
 
 	const bool set_color_ok = SDL_SetRenderDrawColorFloat(app->renderer, 0, 0, 0, 1);
@@ -1053,7 +1143,7 @@ SDL_AppResult SDL_AppIterate(void* appstate) {
 	const bool present_ok = SDL_RenderPresent(app->renderer);
 	SDL_assert(present_ok);
 
-	return SDL_APP_CONTINUE;
+	return app->launcher->isShutdownRequested() ? SDL_APP_SUCCESS : SDL_APP_CONTINUE;
 }
 
 void SDL_AppQuit(void* appstate, SDL_AppResult result) {
