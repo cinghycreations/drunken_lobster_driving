@@ -329,7 +329,6 @@ struct Session {
 	CameraShaker cameraShaker;
 	bool inputCaptureMouse = false;
 
-	bool carPaused = false;
 	float2 carPrevPosition = {0.5f, 0.5f};
 	float2 carPosition = {0.5f, 0.5f};
 	float2 carForwardDirection = {1, 0};
@@ -344,6 +343,7 @@ struct Session {
 
 	std::chrono::microseconds sessionTime;
 	std::optional<std::chrono::microseconds> finishTime;
+	bool paused = false;
 	float mayhem = 0;
 
 	Session(const Settings& _settings, const Content& _content, SDL_Window* _window, SDL_Renderer* _renderer, const std::filesystem::path& level_path)
@@ -527,9 +527,9 @@ struct Session {
 					debug_simulation = true;
 				}
 				ImGui::SetNextItemShortcut(ImGuiMod_Ctrl | ImGuiKey_P);
-				ImGui::Checkbox("Pause", &carPaused);
+				ImGui::Checkbox("Pause", &paused);
 
-				ImGui::BeginDisabled(!(carPaused));
+				ImGui::BeginDisabled(!(paused));
 				ImGui::DragFloat2("Position##Car", &carPosition.x, 0.01f);
 				ImGui::DragFloat2("Forward", &carForwardDirection.x, 0.01f);
 				ImGui::DragFloat2("Steer", &carSteerDirection.x, 0.01f);
@@ -543,7 +543,7 @@ struct Session {
 
 		CarStats car_stats{.destructiveness = 0, .speed = 0};
 
-		if (!carPaused) {
+		if (!paused) {
 			if (debug_simulation) {
 				__debugbreak();
 			}
@@ -568,7 +568,7 @@ struct Session {
 		//---------- Stats ----------//
 
 		if (ImGui::Begin("Car Stats")) {
-			ImGui::BeginDisabled(carPaused);
+			ImGui::BeginDisabled(paused);
 			ImGui::Text("Destructiveness: %f", car_stats.destructiveness);
 			ImGui::Text("Speed: %f", car_stats.speed);
 			ImGui::Text("Super Speed Duration: %d", carSuperSpeedDuration.count());
@@ -884,11 +884,25 @@ struct Session {
 		const int frame = int(rotation / pi2 * content.carFlipbook.textures.size()) % content.carFlipbook.textures.size();
 		renderEntity(carPosition, settings.car.size, content.carFlipbook.textures.at(frame), renderer);
 	}
+
+	void pause(const bool _paused) {
+		paused = _paused;
+	}
+
+	bool isPaused() const {
+		return paused;
+	}
 };
 
 class Launcher {
 public:
-	Launcher(Rml::Context* ui_context) : uiContext(ui_context) {
+	const Settings& settings;
+	Content& content;
+	SDL_Window* window;
+	SDL_Renderer* renderer;
+
+	Launcher(const Settings& _settings, Content& _content, SDL_Window* _window, SDL_Renderer* _renderer, Rml::Context* ui_context)
+		: settings(_settings), content(_content), window(_window), renderer(_renderer), uiContext(ui_context) {
 		{
 			Rml::DataModelConstructor launcher_model_ctor = uiContext->CreateDataModel("launcher");
 			launcher_model_ctor.BindEventCallback("selectLanguageItalian", &Launcher::selectLanguageItalian, this);
@@ -918,17 +932,19 @@ public:
 	}
 
 	void update(const std::chrono::microseconds delta_real_time) {
-		if (nextDocument.has_value()) {
-			if (document) {
-				uiContext->UnloadDocument(document);
-				document = nullptr;
-			}
+		for (auto& deferred_update_func : deferredUpdates) {
+			deferred_update_func();
+		}
+		deferredUpdates.clear();
 
-			document = uiContext->LoadDocument(*nextDocument);
-			SDL_assert(document);
-			document->Show();
+		if (session) {
+			session->update(delta_real_time);
+		}
+	}
 
-			nextDocument.reset();
+	void render() {
+		if (session) {
+			session->render();
 		}
 	}
 
@@ -951,28 +967,50 @@ private:
 	std::string buildDate = __DATE__ " " __TIME__;
 
 	Rml::ElementDocument* document = nullptr;
-	std::optional<std::string> nextDocument;
 
+	std::unique_ptr<Session> session;
+	std::list<std::function<void()>> deferredUpdates;
 	bool shutdownRequested = false;
+
+	void goToPage(const std::string& page) {
+		if (document) {
+			uiContext->UnloadDocument(document);
+			document = nullptr;
+		}
+
+		document = uiContext->LoadDocument(page);
+		SDL_assert(document);
+		document->Show();
+	}
+
+	void createSession() {
+		session.reset();
+		session.reset(new Session(settings, content, window, renderer, "levels/testbed.tmj"));
+	}
+
+	void destroySession() {
+		session.reset();
+	}
 
 	void selectLanguageItalian(Rml::DataModelHandle handle, Rml::Event& event, const Rml::VariantList& params) {}
 	void selectLanguageEnglish(Rml::DataModelHandle handle, Rml::Event& event, const Rml::VariantList& params) {}
 	void selectLanguageSpanish(Rml::DataModelHandle handle, Rml::Event& event, const Rml::VariantList& params) {}
 
 	void goToHowToPlay(Rml::DataModelHandle handle, Rml::Event& event, const Rml::VariantList& params) {
-		nextDocument = "ui/howto.html";
+		deferredUpdates.emplace_back(std::bind(&Launcher::goToPage, this, "ui/howto.html"));
 	}
 
 	void goToDrive(Rml::DataModelHandle handle, Rml::Event& event, const Rml::VariantList& params) {
-		nextDocument = "ui/ingame.html";
+		deferredUpdates.emplace_back(std::bind(&Launcher::goToPage, this, "ui/ingame.html"));
+		deferredUpdates.emplace_back(std::bind(&Launcher::createSession, this));
 	}
 
 	void goToCredits(Rml::DataModelHandle handle, Rml::Event& event, const Rml::VariantList& params) {
-		nextDocument = "ui/credits.html";
+		deferredUpdates.emplace_back(std::bind(&Launcher::goToPage, this, "ui/credits.html"));
 	}
 
 	void goToHome(Rml::DataModelHandle handle, Rml::Event& event, const Rml::VariantList& params) {
-		nextDocument = "ui/home.html";
+		deferredUpdates.emplace_back(std::bind(&Launcher::goToPage, this, "ui/home.html"));
 	}
 
 	void quit(Rml::DataModelHandle handle, Rml::Event& event, const Rml::VariantList& params) {
@@ -980,15 +1018,18 @@ private:
 	}
 
 	void pauseSession(Rml::DataModelHandle handle, Rml::Event& event, const Rml::VariantList& params) {
-		nextDocument = "ui/pause.html";
+		deferredUpdates.emplace_back([this]() { session->pause(true); });
+		deferredUpdates.emplace_back(std::bind(&Launcher::goToPage, this, "ui/pause.html"));
 	}
 
 	void resumeSession(Rml::DataModelHandle handle, Rml::Event& event, const Rml::VariantList& params) {
-		nextDocument = "ui/ingame.html";
+		deferredUpdates.emplace_back(std::bind(&Launcher::goToPage, this, "ui/ingame.html"));
+		deferredUpdates.emplace_back([this]() { session->pause(false); });
 	}
 
 	void exitSession(Rml::DataModelHandle handle, Rml::Event& event, const Rml::VariantList& params) {
-		nextDocument = "ui/home.html";
+		deferredUpdates.emplace_back(std::bind(&Launcher::destroySession, this));
+		deferredUpdates.emplace_back(std::bind(&Launcher::goToPage, this, "ui/home.html"));
 	}
 };
 
@@ -1000,9 +1041,8 @@ struct App {
 	std::unique_ptr<SystemInterface_SDL> uiSystem;
 	std::unique_ptr<RenderInterface_SDL> uiRenderer;
 	Rml::Context* uiContext;
-	std::unique_ptr<Launcher> launcher;
 	std::unique_ptr<Content> content;
-	std::unique_ptr<Session> session;
+	std::unique_ptr<Launcher> launcher;
 
 	bool showDebugUi = false;
 	std::chrono::microseconds currentTime;
@@ -1072,9 +1112,8 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[]) {
 		SDL_assert(load_font2_ok);
 	}
 
-	app->launcher.reset(new Launcher(app->uiContext));
 	app->content.reset(new Content(*app->storage, app->renderer));
-	app->session.reset(new Session(app->settings, *app->content, app->window, app->renderer, "levels/testbed.tmj"));
+	app->launcher.reset(new Launcher(app->settings, *app->content, app->window, app->renderer, app->uiContext));
 	app->currentTime = std::chrono::microseconds(SDL_GetTicksNS() / 1000);
 
 	*appstate = app;
@@ -1117,7 +1156,6 @@ SDL_AppResult SDL_AppIterate(void* appstate) {
 
 	app->settings.update(*app->storage);
 	app->launcher->update(app->deltaTime);
-	app->session->update(app->deltaTime);
 
 	const bool set_color_ok = SDL_SetRenderDrawColorFloat(app->renderer, 0, 0, 0, 1);
 	SDL_assert(set_color_ok);
@@ -1125,7 +1163,7 @@ SDL_AppResult SDL_AppIterate(void* appstate) {
 	const bool clear_ok = SDL_RenderClear(app->renderer);
 	SDL_assert(clear_ok);
 
-	app->session->render();
+	app->launcher->render();
 
 	{
 		const bool ui_update_ok = app->uiContext->Update();
@@ -1149,9 +1187,8 @@ SDL_AppResult SDL_AppIterate(void* appstate) {
 void SDL_AppQuit(void* appstate, SDL_AppResult result) {
 	App* app = static_cast<App*>(appstate);
 
-	app->session.reset();
-	app->content.reset();
 	app->launcher.reset();
+	app->content.reset();
 
 	Rml::Shutdown();
 	app->uiRenderer.reset();
