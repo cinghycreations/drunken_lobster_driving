@@ -20,6 +20,13 @@
 
         main {
             flex: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        main >p{
+            font-size: 6rem;
         }
 
         panel {
@@ -52,7 +59,7 @@
         </panel>
     </header>
     <main>
-
+        <p data-if="countdown > 0">{{countdown}}</p>
     </main>
     <footer>
         <button data-event-click="pauseSession()">Pause</button>

@@ -123,7 +123,7 @@ struct RenderSettings {
 	int skidTileResolution = 256;
 	float4 skidColor = float4{0.5f};
 	float skidSize = 2;
-	float backgroundPeriod = 1.0f;
+	float backgroundPeriod = 5;
 	float backgroundScale = 0.2f;
 	float backgroundDisplacement = 0.2f;
 	float3 backgroundColor = float3{0.5f};
@@ -325,7 +325,7 @@ private:
 	float period = 1;
 	float strength = 0;
 
-	float2 movement;
+	float2 movement = float2{0};
 
 	static float2 shakeSinusoidal(const float time, const float period);
 };
@@ -373,6 +373,10 @@ public:
 
 	std::chrono::microseconds getSessionTime() {
 		return sessionTotalTime;
+	}
+
+	std::chrono::microseconds getCountdownTime() {
+		return countdownTime;
 	}
 
 	int getScore() const {
@@ -433,6 +437,7 @@ private:
 	std::unique_ptr<tson::Map> level;
 	std::vector<CellState> cells;
 
+	std::chrono::microseconds countdownTime;
 	std::chrono::microseconds sessionTotalTime;
 	std::optional<std::chrono::microseconds> finishTime;
 	bool paused = false;
@@ -453,7 +458,7 @@ private:
 };
 
 Session::Session(const Settings& _settings, const Content& _content, SDL_Window* _window, SDL_Renderer* _renderer, const std::filesystem::path& level_path)
-	: settings(_settings), content(_content), window(_window), renderer(_renderer), carSuperSpeedDuration(0), sessionTotalTime(0) {
+	: settings(_settings), content(_content), window(_window), renderer(_renderer), carSuperSpeedDuration(0), countdownTime(3000000 - 1), sessionTotalTime(0) {
 
 	tson::Tileson parser(std::unique_ptr<tson::NlohmannJson>(new tson::NlohmannJson));
 	level = parser.parse(level_path);
@@ -656,11 +661,19 @@ void Session::update(const std::chrono::microseconds real_delta_time) {
 			__debugbreak();
 		}
 
-		sessionTotalTime += real_delta_time;
-		car_stats = updateCarPerks(real_delta_time);
-		updateCarDrive(real_delta_time, car_stats);
-		updateCarCollisions(sessionTotalTime, car_stats);
-		cameraShaker.update(real_delta_time);
+		if (real_delta_time >= countdownTime) {
+			countdownTime = std::chrono::microseconds(0);
+		} else {
+			countdownTime -= real_delta_time;
+		}
+
+		if (countdownTime.count() == 0) {
+			sessionTotalTime += real_delta_time;
+			car_stats = updateCarPerks(real_delta_time);
+			updateCarDrive(real_delta_time, car_stats);
+			updateCarCollisions(sessionTotalTime, car_stats);
+			cameraShaker.update(real_delta_time);
+		}
 	}
 
 	if (cameraFollowCar) {
@@ -1013,6 +1026,7 @@ private:
 	int speed = 0;
 	std::string time;
 	int score = 0;
+	int countdown = 0;
 
 	Rml::ElementDocument* document = nullptr;
 
@@ -1067,6 +1081,7 @@ Launcher::Launcher(const Settings& _settings, Content& _content, SDL_Window* _wi
 		session_model_ctor.Bind("speed", &speed);
 		session_model_ctor.Bind("time", &time);
 		session_model_ctor.Bind("score", &score);
+		session_model_ctor.Bind("countdown", &countdown);
 		sessionModel = session_model_ctor.GetModelHandle();
 	}
 
@@ -1096,6 +1111,9 @@ void Launcher::update(const std::chrono::microseconds real_total_time, const std
 
 		time = TimeUtils::microsecondsToString(session->getSessionTime());
 		sessionModel.DirtyVariable("time");
+
+		countdown = (session->getCountdownTime().count() + 999999) / 1000000;
+		sessionModel.DirtyVariable("countdown");
 	}
 
 	backgroundTime = real_total_time;
