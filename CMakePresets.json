@@ -1,0 +1,61 @@
+{
+    "version": 6,
+    "cmakeMinimumRequired": {
+        "major": 3,
+        "minor": 31,
+        "patch": 0
+    },
+    "configurePresets": [
+        {
+            "name": "windows-dev",
+            "binaryDir": "${sourceDir}/temp/build/windows-dev"
+        },
+        {
+            "name": "windows-release",
+            "binaryDir": "${sourceDir}/temp/build/windows-release",
+            "cacheVariables": {
+                "CC_HAS_DEVUI" : "OFF"
+            }
+        }
+    ],
+    "buildPresets": [
+        {
+            "name": "windows-dev",
+            "configurePreset": "windows-dev",
+            "configuration": "Debug"
+        },
+        {
+            "name": "windows-release",
+            "configurePreset": "windows-release",
+            "configuration": "Release"
+        }
+    ],
+    "workflowPresets": [
+        {
+            "name": "windows-dev",
+            "steps": [
+                {
+                    "type": "configure",
+                    "name": "windows-dev"
+                },
+                {
+                    "type": "build",
+                    "name": "windows-dev"
+                }
+            ]
+        },
+        {
+            "name": "windows-release",
+            "steps": [
+                {
+                    "type": "configure",
+                    "name": "windows-release"
+                },
+                {
+                    "type": "build",
+                    "name": "windows-release"
+                }
+            ]
+        }
+    ]
+}
