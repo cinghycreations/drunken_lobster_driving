@@ -14,7 +14,41 @@
             "name": "windows-release",
             "binaryDir": "${sourceDir}/temp/build/windows-release",
             "cacheVariables": {
-                "CC_HAS_DEVUI" : "OFF"
+                "CC_HAS_DEVUI": "OFF"
+            }
+        },
+        {
+            "name": "linux-dev",
+            "generator": "Ninja Multi-Config",
+            "binaryDir": "${sourceDir}/temp/build/linux-dev"
+        },
+        {
+            "name": "linux-release",
+            "generator": "Ninja Multi-Config",
+            "binaryDir": "${sourceDir}/temp/build/linux-release",
+            "cacheVariables": {
+                "CC_HAS_DEVUI": "OFF"
+            }
+        },
+        {
+            "name": "html5-dev",
+            "generator": "Ninja Multi-Config",
+            "binaryDir": "${sourceDir}/temp/build/html5-dev",
+            "toolchainFile": "D:/emsdk/upstream/emscripten/cmake/Modules/Platform/Emscripten.cmake",
+            "cacheVariables": {
+                "CMAKE_EXE_LINKER_FLAGS": "-s TOTAL_MEMORY=67108864 --shell-file D:/emsdk/upstream/emscripten/src/shell_minimal.html",
+                "CMAKE_EXECUTABLE_SUFFIX_CXX": ".html"
+            }
+        },
+        {
+            "name": "html5-release",
+            "generator": "Ninja Multi-Config",
+            "binaryDir": "${sourceDir}/temp/build/html5-release",
+            "toolchainFile": "D:/emsdk/upstream/emscripten/cmake/Modules/Platform/Emscripten.cmake",
+            "cacheVariables": {
+                "CC_HAS_DEVUI": "OFF",
+                "CMAKE_EXE_LINKER_FLAGS": "-s TOTAL_MEMORY=67108864 --shell-file D:/emsdk/upstream/emscripten/src/shell_minimal.html",
+                "CMAKE_EXECUTABLE_SUFFIX_CXX": ".html"
             }
         }
     ],
@@ -27,6 +61,26 @@
         {
             "name": "windows-release",
             "configurePreset": "windows-release",
+            "configuration": "Release"
+        },
+        {
+            "name": "linux-dev",
+            "configurePreset": "linux-dev",
+            "configuration": "Debug"
+        },
+        {
+            "name": "linux-release",
+            "configurePreset": "linux-release",
+            "configuration": "Release"
+        },
+        {
+            "name": "html5-dev",
+            "configurePreset": "html5-dev",
+            "configuration": "Debug"
+        },
+        {
+            "name": "html5-release",
+            "configurePreset": "html5-release",
             "configuration": "Release"
         }
     ],
@@ -54,6 +108,58 @@
                 {
                     "type": "build",
                     "name": "windows-release"
+                }
+            ]
+        },
+        {
+            "name": "linux-dev",
+            "steps": [
+                {
+                    "type": "configure",
+                    "name": "linux-dev"
+                },
+                {
+                    "type": "build",
+                    "name": "linux-dev"
+                }
+            ]
+        },
+        {
+            "name": "linux-release",
+            "steps": [
+                {
+                    "type": "configure",
+                    "name": "linux-release"
+                },
+                {
+                    "type": "build",
+                    "name": "linux-release"
+                }
+            ]
+        },
+        {
+            "name": "html5-dev",
+            "steps": [
+                {
+                    "type": "configure",
+                    "name": "html5-dev"
+                },
+                {
+                    "type": "build",
+                    "name": "html5-dev"
+                }
+            ]
+        },
+        {
+            "name": "html5-release",
+            "steps": [
+                {
+                    "type": "configure",
+                    "name": "html5-release"
+                },
+                {
+                    "type": "build",
+                    "name": "html5-release"
                 }
             ]
         }
