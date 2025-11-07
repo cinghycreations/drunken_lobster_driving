@@ -14,7 +14,8 @@
             "name": "windows-release",
             "binaryDir": "${sourceDir}/temp/build/windows-release",
             "cacheVariables": {
-                "CC_HAS_DEVUI": "OFF"
+                "CC_HAS_DEVUI": "OFF",
+                "CC_HAS_EMBED_CONTENT": "ON"
             }
         },
         {
@@ -27,7 +28,8 @@
             "generator": "Ninja Multi-Config",
             "binaryDir": "${sourceDir}/temp/build/linux-release",
             "cacheVariables": {
-                "CC_HAS_DEVUI": "OFF"
+                "CC_HAS_DEVUI": "OFF",
+                "CC_HAS_EMBED_CONTENT": "ON"
             }
         },
         {
