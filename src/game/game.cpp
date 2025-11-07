@@ -1103,6 +1103,15 @@ void Launcher::update(const std::chrono::microseconds real_total_time, const std
 	}
 	deferredUpdates.clear();
 
+	{
+		int numkeys;
+		const bool* keystates = SDL_GetKeyboardState(&numkeys);
+		if (session && !session->isPaused() && SDL_SCANCODE_ESCAPE < numkeys && keystates[SDL_SCANCODE_ESCAPE]) {
+			goToPage("ui/pause.html");
+			session->pause(true);
+		}
+	}
+
 	if (session) {
 		session->update(real_delta_time);
 
