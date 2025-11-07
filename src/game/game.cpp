@@ -658,7 +658,7 @@ void Session::update(const std::chrono::microseconds real_delta_time) {
 
 	if (!paused) {
 		if (debug_simulation) {
-			__debugbreak();
+			SDL_TriggerBreakpoint();
 		}
 
 		if (real_delta_time >= countdownTime) {
