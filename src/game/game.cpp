@@ -443,7 +443,7 @@ private:
 };
 
 Session::Session(const Settings& _settings, const Content& _content, SDL_Window* _window, SDL_Renderer* _renderer, const std::filesystem::path& level_path)
-	: settings(_settings), content(_content), window(_window), renderer(_renderer), sessionTotalTime(0) {
+	: settings(_settings), content(_content), window(_window), renderer(_renderer), carSuperSpeedDuration(0), sessionTotalTime(0) {
 
 	tson::Tileson parser(std::unique_ptr<tson::NlohmannJson>(new tson::NlohmannJson));
 	level = parser.parse(level_path);
