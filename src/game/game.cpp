@@ -1147,7 +1147,15 @@ void Launcher::exitSession(Rml::DataModelHandle handle, Rml::Event& event, const
 // App //
 /////////
 
-struct App {
+class App {
+public:
+	App(int argc, char* argv[]);
+	~App();
+
+	SDL_AppResult processEvent(SDL_Event* event);
+	SDL_AppResult iterate();
+
+private:
 	SDL_Window* window = nullptr;
 	SDL_Renderer* renderer = nullptr;
 	std::unique_ptr<Storage> storage;
@@ -1163,18 +1171,17 @@ struct App {
 	std::chrono::microseconds deltaTime;
 };
 
-SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[]) {
+App::App(int argc, char* argv[]) {
 	bool init_ok = SDL_Init(SDL_INIT_EVENTS | SDL_INIT_VIDEO);
 	SDL_assert(init_ok);
 
-	App* app = new App;
-	app->window = SDL_CreateWindow("Drunken Lobster Driving", 1920, 1080, SDL_WINDOW_RESIZABLE | SDL_WINDOW_MAXIMIZED | SDL_WINDOW_HIGH_PIXEL_DENSITY);
-	SDL_assert(app->window);
+	window = SDL_CreateWindow("Drunken Lobster Driving", 1920, 1080, SDL_WINDOW_RESIZABLE | SDL_WINDOW_MAXIMIZED | SDL_WINDOW_HIGH_PIXEL_DENSITY);
+	SDL_assert(window);
 
-	app->renderer = SDL_CreateRenderer(app->window, nullptr);
-	SDL_assert(app->renderer);
+	renderer = SDL_CreateRenderer(window, nullptr);
+	SDL_assert(renderer);
 
-	const bool vsync_ok = SDL_SetRenderVSync(app->renderer, 1);
+	const bool vsync_ok = SDL_SetRenderVSync(renderer, 1);
 	SDL_assert(vsync_ok);
 
 	{
@@ -1183,40 +1190,40 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[]) {
 
 		ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_DockingEnable;
 
-		const float main_scale = SDL_GetWindowDisplayScale(app->window);
+		const float main_scale = SDL_GetWindowDisplayScale(window);
 		ImGui::StyleColorsDark();
 		ImGui::GetStyle().FontScaleDpi = main_scale;
 
 		const ImFont* base_font = ImGui::GetIO().Fonts->AddFontFromFileTTF("fonts/NotoSans-Regular.ttf", 18);
 		SDL_assert(base_font);
 
-		const bool imgui_init1_ok = ImGui_ImplSDL3_InitForSDLRenderer(app->window, app->renderer);
+		const bool imgui_init1_ok = ImGui_ImplSDL3_InitForSDLRenderer(window, renderer);
 		SDL_assert(imgui_init1_ok);
 
-		const bool imgui_init2_ok = ImGui_ImplSDLRenderer3_Init(app->renderer);
+		const bool imgui_init2_ok = ImGui_ImplSDLRenderer3_Init(renderer);
 		SDL_assert(imgui_init2_ok);
 	}
 
-	app->storage.reset(new Storage);
+	storage.reset(new Storage);
 
-	if (app->storage->exists("settings.json")) {
-		const nlohmann::json json = app->storage->loadJson("settings.json");
-		app->settings = json;
+	if (storage->exists("settings.json")) {
+		const nlohmann::json json = storage->loadJson("settings.json");
+		settings = json;
 	}
 
 	{
-		app->uiSystem.reset(new SystemInterface_SDL);
-		app->uiRenderer.reset(new RenderInterface_SDL(app->renderer));
-		Rml::SetSystemInterface(app->uiSystem.get());
-		Rml::SetRenderInterface(app->uiRenderer.get());
+		uiSystem.reset(new SystemInterface_SDL);
+		uiRenderer.reset(new RenderInterface_SDL(renderer));
+		Rml::SetSystemInterface(uiSystem.get());
+		Rml::SetRenderInterface(uiRenderer.get());
 
 		const bool ui_initialize_ok = Rml::Initialise();
 		SDL_assert(ui_initialize_ok);
 
-		app->uiContext = Rml::CreateContext("RmlContext", Rml::Vector2i(1920, 1080));
-		SDL_assert(app->uiContext);
+		uiContext = Rml::CreateContext("RmlContext", Rml::Vector2i(1920, 1080));
+		SDL_assert(uiContext);
 
-		const bool debugger_init_ok = Rml::Debugger::Initialise(app->uiContext);
+		const bool debugger_init_ok = Rml::Debugger::Initialise(uiContext);
 		SDL_assert(debugger_init_ok);
 
 		const bool load_font1_ok = Rml::LoadFontFace("fonts/NotoSans-Regular.ttf", true);
@@ -1226,29 +1233,24 @@ SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[]) {
 		SDL_assert(load_font2_ok);
 	}
 
-	app->content.reset(new Content(*app->storage, app->renderer));
-	app->launcher.reset(new Launcher(app->settings, *app->content, app->window, app->renderer, app->uiContext));
-	app->currentTime = std::chrono::microseconds(SDL_GetTicksNS() / 1000);
-
-	*appstate = app;
-	return SDL_APP_CONTINUE;
+	content.reset(new Content(*storage, renderer));
+	launcher.reset(new Launcher(settings, *content, window, renderer, uiContext));
+	currentTime = std::chrono::microseconds(SDL_GetTicksNS() / 1000);
 }
 
-SDL_AppResult SDL_AppEvent(void* appstate, SDL_Event* event) {
-	App* app = static_cast<App*>(appstate);
-
-	if (app->showDebugUi) {
+SDL_AppResult App::processEvent(SDL_Event* event) {
+	if (showDebugUi) {
 		ImGui_ImplSDL3_ProcessEvent(event);
 	}
-	RmlSDL::InputEventHandler(app->uiContext, app->window, *event);
+	RmlSDL::InputEventHandler(uiContext, window, *event);
 
 	if (event->type == SDL_EVENT_QUIT) {
 		return SDL_APP_SUCCESS;
 	} else if (event->type == SDL_EVENT_WINDOW_DISPLAY_SCALE_CHANGED) {
-		const float main_scale = SDL_GetWindowDisplayScale(app->window);
+		const float main_scale = SDL_GetWindowDisplayScale(window);
 		ImGui::GetStyle().FontScaleDpi = main_scale;
 	} else if (event->type == SDL_EVENT_KEY_DOWN && event->key.scancode == SDL_SCANCODE_F1) {
-		app->showDebugUi = !app->showDebugUi;
+		showDebugUi = !showDebugUi;
 	} else if (event->type == SDL_EVENT_KEY_DOWN && event->key.scancode == SDL_SCANCODE_F12) {
 		Rml::Debugger::SetVisible(!Rml::Debugger::IsVisible());
 	}
@@ -1256,71 +1258,82 @@ SDL_AppResult SDL_AppEvent(void* appstate, SDL_Event* event) {
 	return SDL_APP_CONTINUE;
 }
 
-SDL_AppResult SDL_AppIterate(void* appstate) {
-	App* app = static_cast<App*>(appstate);
-
+SDL_AppResult App::iterate() {
 	const std::chrono::microseconds now(SDL_GetTicksNS() / 1000);
-	app->deltaTime = now - app->currentTime;
-	app->currentTime = now;
+	deltaTime = now - currentTime;
+	currentTime = now;
 
 	ImGui_ImplSDLRenderer3_NewFrame();
 	ImGui_ImplSDL3_NewFrame();
 	ImGui::NewFrame();
 	ImGui::DockSpaceOverViewport(0, nullptr, ImGuiDockNodeFlags_PassthruCentralNode);
 
-	app->settings.update(*app->storage);
-	app->launcher->update(app->deltaTime);
+	settings.update(*storage);
+	launcher->update(deltaTime);
 
-	const bool set_color_ok = SDL_SetRenderDrawColorFloat(app->renderer, 0, 0, 0, 1);
+	const bool set_color_ok = SDL_SetRenderDrawColorFloat(renderer, 0, 0, 0, 1);
 	SDL_assert(set_color_ok);
 
-	const bool clear_ok = SDL_RenderClear(app->renderer);
+	const bool clear_ok = SDL_RenderClear(renderer);
 	SDL_assert(clear_ok);
 
-	app->launcher->render();
+	launcher->render();
 
 	{
-		const bool ui_update_ok = app->uiContext->Update();
+		const bool ui_update_ok = uiContext->Update();
 		SDL_assert(ui_update_ok);
 
-		const bool ui_render_ok = app->uiContext->Render();
+		const bool ui_render_ok = uiContext->Render();
 		SDL_assert(ui_render_ok);
 	}
 
 	ImGui::Render();
-	if (app->showDebugUi) {
-		ImGui_ImplSDLRenderer3_RenderDrawData(ImGui::GetDrawData(), app->renderer);
+	if (showDebugUi) {
+		ImGui_ImplSDLRenderer3_RenderDrawData(ImGui::GetDrawData(), renderer);
 	}
 
-	const bool present_ok = SDL_RenderPresent(app->renderer);
+	const bool present_ok = SDL_RenderPresent(renderer);
 	SDL_assert(present_ok);
 
-	return app->launcher->isShutdownRequested() ? SDL_APP_SUCCESS : SDL_APP_CONTINUE;
+	return launcher->isShutdownRequested() ? SDL_APP_SUCCESS : SDL_APP_CONTINUE;
 }
 
-void SDL_AppQuit(void* appstate, SDL_AppResult result) {
-	App* app = static_cast<App*>(appstate);
-
-	app->launcher.reset();
-	app->content.reset();
+App::~App() {
+	launcher.reset();
+	content.reset();
 
 	Rml::Shutdown();
-	app->uiRenderer.reset();
-	app->uiSystem.reset();
+	uiRenderer.reset();
+	uiSystem.reset();
 
-	app->storage.reset();
+	storage.reset();
 
 	ImGui_ImplSDLRenderer3_Shutdown();
 	ImGui_ImplSDL3_Shutdown();
 	ImGui::DestroyContext();
 
-	SDL_DestroyRenderer(app->renderer);
-	app->renderer = nullptr;
+	SDL_DestroyRenderer(renderer);
+	renderer = nullptr;
 
-	SDL_DestroyWindow(app->window);
-	app->window = nullptr;
-
-	delete app;
+	SDL_DestroyWindow(window);
+	window = nullptr;
 
 	SDL_Quit();
+}
+
+SDL_AppResult SDL_AppInit(void** appstate, int argc, char* argv[]) {
+	*appstate = new App(argc, argv);
+	return SDL_APP_CONTINUE;
+}
+
+SDL_AppResult SDL_AppEvent(void* appstate, SDL_Event* event) {
+	return static_cast<App*>(appstate)->processEvent(event);
+}
+
+SDL_AppResult SDL_AppIterate(void* appstate) {
+	return static_cast<App*>(appstate)->iterate();
+}
+
+void SDL_AppQuit(void* appstate, SDL_AppResult result) {
+	delete static_cast<App*>(appstate);
 }
