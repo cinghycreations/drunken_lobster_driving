@@ -24,6 +24,9 @@
 #include <imgui_impl_sdl3.h>
 #include <imgui_impl_sdlrenderer3.h>
 #endif
+#ifdef CC_HAS_EMBED_CONTENT
+#include <cmrc/cmrc.hpp>
+#endif
 
 using float2 = glm::vec2;
 using float3 = glm::vec3;
@@ -73,6 +76,20 @@ public:
 	void saveJson(const std::filesystem::path& path, const nlohmann::json& json) const;
 };
 
+#ifdef CC_HAS_EMBED_CONTENT
+namespace cmrc::content {
+cmrc::embedded_filesystem get_filesystem();
+} // namespace cmrc::content
+
+bool Storage::exists(const std::filesystem::path& path) const {
+	return cmrc::content::get_filesystem().exists(path.string());
+}
+
+SDL_IOStream* Storage::open(const std::filesystem::path& path) const {
+	cmrc::file file = cmrc::content::get_filesystem().open(path.string());
+	return SDL_IOFromConstMem(file.begin(), file.size());
+}
+#else
 bool Storage::exists(const std::filesystem::path& path) const {
 	return SDL_GetPathInfo(path.string().c_str(), nullptr);
 }
@@ -80,6 +97,7 @@ bool Storage::exists(const std::filesystem::path& path) const {
 SDL_IOStream* Storage::open(const std::filesystem::path& path) const {
 	return SDL_IOFromFile(path.string().c_str(), "rb");
 }
+#endif
 
 nlohmann::json Storage::loadJson(const std::filesystem::path& path) const {
 	SDL_IOStream* stream = open(path);
@@ -357,7 +375,7 @@ float2 CameraShaker::shakeSinusoidal(const float time, const float period) {
 
 class Session {
 public:
-	Session(const Settings& _settings, const Content& _content, SDL_Window* _window, SDL_Renderer* _renderer, const std::filesystem::path& level_path);
+	Session(const Settings& _settings, const Storage& _storage, const Content& _content, SDL_Window* _window, SDL_Renderer* _renderer, const std::filesystem::path& level_path);
 	~Session();
 
 	void update(const std::chrono::microseconds delta_real_time);
@@ -414,6 +432,7 @@ private:
 	};
 
 	const Settings& settings;
+	const Storage& storage;
 	const Content& content;
 	SDL_Window* window;
 	SDL_Renderer* renderer;
@@ -457,11 +476,16 @@ private:
 	void renderGrid();
 };
 
-Session::Session(const Settings& _settings, const Content& _content, SDL_Window* _window, SDL_Renderer* _renderer, const std::filesystem::path& level_path)
-	: settings(_settings), content(_content), window(_window), renderer(_renderer), carSuperSpeedDuration(0), countdownTime(3000000 - 1), sessionTotalTime(0) {
+Session::Session(const Settings& _settings, const Storage& _storage, const Content& _content, SDL_Window* _window, SDL_Renderer* _renderer, const std::filesystem::path& level_path)
+	: settings(_settings), storage(_storage), content(_content), window(_window), renderer(_renderer), carSuperSpeedDuration(0), countdownTime(3000000 - 1), sessionTotalTime(0) {
+
+	SDL_IOStream* level_stream = storage.open(level_path);
+	size_t level_data_size = 0;
+	void* level_data = SDL_LoadFile_IO(level_stream, &level_data_size, true);
+	SDL_assert(level_data);
 
 	tson::Tileson parser(std::unique_ptr<tson::NlohmannJson>(new tson::NlohmannJson));
-	level = parser.parse(level_path);
+	level = parser.parse(level_data, level_data_size);
 	SDL_assert(level->getStatus() == tson::ParseStatus::OK);
 	SDL_assert(level->getLayers().size() == 2);
 	SDL_assert(level->getLayer("ground"));
@@ -999,9 +1023,54 @@ void Session::renderGrid() {
 	}
 }
 
+//////////////
+// Launcher //
+//////////////
+
+class StorageFileInterface : public Rml::FileInterface {
+public:
+	Storage& storage;
+
+	StorageFileInterface(Storage& _storage);
+
+	virtual Rml::FileHandle Open(const Rml::String& path) override;
+	virtual void Close(Rml::FileHandle handle) override;
+	virtual size_t Read(void* buffer, size_t size, Rml::FileHandle handle) override;
+	virtual bool Seek(Rml::FileHandle handle, long offset, int origin) override;
+	virtual size_t Tell(Rml::FileHandle handle) override;
+};
+
+StorageFileInterface::StorageFileInterface(Storage& _storage) : storage(_storage) {}
+
+Rml::FileHandle StorageFileInterface::Open(const Rml::String& path) {
+	SDL_IOStream* stream = storage.open(path);
+	return reinterpret_cast<Rml::FileHandle>(stream);
+}
+
+void StorageFileInterface::Close(Rml::FileHandle handle) {
+	SDL_IOStream* stream = reinterpret_cast<SDL_IOStream*>(handle);
+	SDL_CloseIO(stream);
+}
+
+size_t StorageFileInterface::Read(void* buffer, size_t size, Rml::FileHandle handle) {
+	SDL_IOStream* stream = reinterpret_cast<SDL_IOStream*>(handle);
+	return SDL_ReadIO(stream, buffer, size);
+}
+
+bool StorageFileInterface::Seek(Rml::FileHandle handle, long offset, int origin) {
+	SDL_IOStream* stream = reinterpret_cast<SDL_IOStream*>(handle);
+	const SDL_IOWhence whence = (origin == SEEK_SET) ? SDL_IO_SEEK_SET : (origin == SEEK_END) ? SDL_IO_SEEK_END : SDL_IO_SEEK_CUR;
+	return SDL_SeekIO(stream, offset, whence) != -1;
+}
+
+size_t StorageFileInterface::Tell(Rml::FileHandle handle) {
+	SDL_IOStream* stream = reinterpret_cast<SDL_IOStream*>(handle);
+	return SDL_TellIO(stream);
+}
+
 class Launcher {
 public:
-	Launcher(const Settings& _settings, Content& _content, SDL_Window* _window, SDL_Renderer* _renderer, Rml::Context* ui_context);
+	Launcher(const Settings& _settings, const Storage& _storage, Content& _content, SDL_Window* _window, SDL_Renderer* _renderer, Rml::Context* ui_context);
 	~Launcher();
 
 	void update(const std::chrono::microseconds real_total_time, const std::chrono::microseconds delta_real_time);
@@ -1013,6 +1082,7 @@ public:
 
 private:
 	const Settings& settings;
+	const Storage& storage;
 	Content& content;
 	SDL_Window* window;
 	SDL_Renderer* renderer;
@@ -1055,8 +1125,8 @@ private:
 	void renderBackground();
 };
 
-Launcher::Launcher(const Settings& _settings, Content& _content, SDL_Window* _window, SDL_Renderer* _renderer, Rml::Context* ui_context)
-	: settings(_settings), content(_content), window(_window), renderer(_renderer), uiContext(ui_context) {
+Launcher::Launcher(const Settings& _settings, const Storage& _storage, Content& _content, SDL_Window* _window, SDL_Renderer* _renderer, Rml::Context* ui_context)
+	: settings(_settings), storage(_storage), content(_content), window(_window), renderer(_renderer), uiContext(ui_context) {
 	{
 		Rml::DataModelConstructor launcher_model_ctor = uiContext->CreateDataModel("launcher");
 		launcher_model_ctor.BindEventCallback("selectLanguageItalian", &Launcher::selectLanguageItalian, this);
@@ -1149,7 +1219,7 @@ void Launcher::goToPage(const std::string& page) {
 
 void Launcher::createSession() {
 	session.reset();
-	session.reset(new Session(settings, content, window, renderer, "levels/testbed.tmj"));
+	session.reset(new Session(settings, storage, content, window, renderer, "levels/testbed.tmj"));
 }
 
 void Launcher::destroySession() {
@@ -1245,6 +1315,7 @@ private:
 	SDL_Renderer* renderer = nullptr;
 	std::unique_ptr<Storage> storage;
 	Settings settings;
+	std::unique_ptr<StorageFileInterface> uiStorage;
 	std::unique_ptr<SystemInterface_SDL> uiSystem;
 	std::unique_ptr<RenderInterface_SDL> uiRenderer;
 	Rml::Context* uiContext;
@@ -1269,6 +1340,8 @@ App::App(int argc, char* argv[]) {
 	const bool vsync_ok = SDL_SetRenderVSync(renderer, 1);
 	SDL_assert(vsync_ok);
 
+	storage.reset(new Storage);
+
 #ifdef CC_HAS_DEVUI
 	{
 		ImGuiContext* imgui_context = ImGui::CreateContext();
@@ -1280,7 +1353,12 @@ App::App(int argc, char* argv[]) {
 		ImGui::StyleColorsDark();
 		ImGui::GetStyle().FontScaleDpi = main_scale;
 
-		const ImFont* base_font = ImGui::GetIO().Fonts->AddFontFromFileTTF("fonts/NotoSans-Regular.ttf", 18);
+		SDL_IOStream* font_stream = storage->open("fonts/NotoSans-Regular.ttf");
+		size_t font_data_size = 0;
+		void* font_data = SDL_LoadFile_IO(font_stream, &font_data_size, true);
+		SDL_assert(font_data);
+
+		const ImFont* base_font = ImGui::GetIO().Fonts->AddFontFromMemoryTTF(font_data, font_data_size, 18);
 		SDL_assert(base_font);
 
 		const bool imgui_init1_ok = ImGui_ImplSDL3_InitForSDLRenderer(window, renderer);
@@ -1291,16 +1369,16 @@ App::App(int argc, char* argv[]) {
 	}
 #endif
 
-	storage.reset(new Storage);
-
 	if (storage->exists("settings.json")) {
 		const nlohmann::json json = storage->loadJson("settings.json");
 		settings = json;
 	}
 
 	{
+		uiStorage.reset(new StorageFileInterface(*storage));
 		uiSystem.reset(new SystemInterface_SDL);
 		uiRenderer.reset(new RenderInterface_SDL(renderer));
+		Rml::SetFileInterface(uiStorage.get());
 		Rml::SetSystemInterface(uiSystem.get());
 		Rml::SetRenderInterface(uiRenderer.get());
 
@@ -1321,7 +1399,7 @@ App::App(int argc, char* argv[]) {
 	}
 
 	content.reset(new Content(*storage, renderer));
-	launcher.reset(new Launcher(settings, *content, window, renderer, uiContext));
+	launcher.reset(new Launcher(settings, *storage, *content, window, renderer, uiContext));
 	realTotalTime = std::chrono::microseconds(SDL_GetTicksNS() / 1000);
 }
 
