@@ -26,6 +26,7 @@
 #endif
 
 using float2 = glm::vec2;
+using float3 = glm::vec3;
 using float4 = glm::vec4;
 using int2 = glm::ivec2;
 
@@ -122,8 +123,13 @@ struct RenderSettings {
 	int skidTileResolution = 256;
 	float4 skidColor = float4{0.5f};
 	float skidSize = 2;
+	float backgroundPeriod = 1.0f;
+	float backgroundScale = 0.2f;
+	float backgroundDisplacement = 0.2f;
+	float3 backgroundColor = float3{0.5f};
 
-	NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(RenderSettings, skidTileResolution, skidColor, skidSize);
+	NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(RenderSettings, skidTileResolution, skidColor, skidSize, backgroundPeriod, backgroundScale, backgroundDisplacement,
+												backgroundColor);
 };
 
 struct CarSettings {
@@ -188,6 +194,10 @@ void Settings::update(const Storage& storage) {
 			ImGui::DragInt("Skid Tile Resolution", &render.skidTileResolution, 1, 32, 512);
 			ImGui::ColorEdit4("Skid Color", &render.skidColor.r);
 			ImGui::DragFloat("Skid Size", &render.skidSize, 0.01f);
+			ImGui::DragFloat("Background Period", &render.backgroundPeriod, 0.01f);
+			ImGui::DragFloat("Background Scale", &render.backgroundScale, 0.01f);
+			ImGui::DragFloat("Background Displacement", &render.backgroundDisplacement, 0.01f);
+			ImGui::ColorEdit3("Background Color", &render.backgroundColor.r);
 		}
 
 		if (ImGui::CollapsingHeader("Camera", ImGuiTreeNodeFlags_DefaultOpen)) {
@@ -981,7 +991,7 @@ public:
 	Launcher(const Settings& _settings, Content& _content, SDL_Window* _window, SDL_Renderer* _renderer, Rml::Context* ui_context);
 	~Launcher();
 
-	void update(const std::chrono::microseconds delta_real_time);
+	void update(const std::chrono::microseconds real_total_time, const std::chrono::microseconds delta_real_time);
 	void render();
 
 	bool isShutdownRequested() const {
@@ -1010,6 +1020,8 @@ private:
 	std::list<std::function<void()>> deferredUpdates;
 	bool shutdownRequested = false;
 
+	std::chrono::microseconds backgroundTime;
+
 	void goToPage(const std::string& page);
 	void createSession();
 	void destroySession();
@@ -1025,6 +1037,8 @@ private:
 	void pauseSession(Rml::DataModelHandle handle, Rml::Event& event, const Rml::VariantList& params);
 	void resumeSession(Rml::DataModelHandle handle, Rml::Event& event, const Rml::VariantList& params);
 	void exitSession(Rml::DataModelHandle handle, Rml::Event& event, const Rml::VariantList& params);
+
+	void renderBackground();
 };
 
 Launcher::Launcher(const Settings& _settings, Content& _content, SDL_Window* _window, SDL_Renderer* _renderer, Rml::Context* ui_context)
@@ -1068,7 +1082,7 @@ Launcher::~Launcher() {
 	}
 }
 
-void Launcher::update(const std::chrono::microseconds real_delta_time) {
+void Launcher::update(const std::chrono::microseconds real_total_time, const std::chrono::microseconds real_delta_time) {
 	for (auto& deferred_update_func : deferredUpdates) {
 		deferred_update_func();
 	}
@@ -1083,11 +1097,15 @@ void Launcher::update(const std::chrono::microseconds real_delta_time) {
 		time = TimeUtils::microsecondsToString(session->getSessionTime());
 		sessionModel.DirtyVariable("time");
 	}
+
+	backgroundTime = real_total_time;
 }
 
 void Launcher::render() {
 	if (session) {
 		session->render();
+	} else {
+		renderBackground();
 	}
 }
 
@@ -1149,6 +1167,38 @@ void Launcher::resumeSession(Rml::DataModelHandle handle, Rml::Event& event, con
 void Launcher::exitSession(Rml::DataModelHandle handle, Rml::Event& event, const Rml::VariantList& params) {
 	deferredUpdates.emplace_back(std::bind(&Launcher::destroySession, this));
 	deferredUpdates.emplace_back(std::bind(&Launcher::goToPage, this, "ui/home.html"));
+}
+
+void Launcher::renderBackground() {
+	int render_width = 0, render_height = 0;
+	const bool output_size_ok = SDL_GetRenderOutputSize(renderer, &render_width, &render_height);
+	SDL_assert(output_size_ok);
+
+	SDL_Texture* texture = content.carFlipbook.textures.front();
+	const std::chrono::microseconds sin_period = TimeUtils::floatSecondsToMicroseconds(settings.render.backgroundPeriod);
+	const std::chrono::microseconds cos_period = TimeUtils::floatSecondsToMicroseconds(settings.render.backgroundPeriod * 1.3f);
+	const float sin_angle = float(backgroundTime.count() % sin_period.count()) / float(sin_period.count()) * std::numbers::pi * 2;
+	const float cos_angle = float(backgroundTime.count() % cos_period.count()) / float(cos_period.count()) * std::numbers::pi * 2;
+	const float texture_unit = float(render_width) * settings.render.backgroundScale;
+	const float displacement_unit = float(render_width) * settings.render.backgroundDisplacement;
+	const float displacement_x = displacement_unit * std::cos(cos_angle);
+	const float displacement_y = displacement_unit * std::sin(sin_angle);
+	const float texture_scale = texture_unit / float(texture->w);
+	const SDL_FRect dest_rect{
+		.x = displacement_x - (std::floor(displacement_x / texture_unit) + 1) * texture_unit,
+		.y = displacement_y - (std::floor(displacement_y / texture_unit) + 1) * texture_unit,
+		.w = render_width + texture_unit,
+		.h = render_height + texture_unit,
+	};
+
+	const bool set_color_ok = SDL_SetRenderDrawColorFloat(renderer, settings.render.backgroundColor.r, settings.render.backgroundColor.g, settings.render.backgroundColor.b, 1);
+	SDL_assert(set_color_ok);
+
+	const bool render_rect_ok = SDL_RenderFillRect(renderer, nullptr);
+	SDL_assert(render_rect_ok);
+
+	const bool render_texture_ok = SDL_RenderTextureTiled(renderer, texture, nullptr, texture_scale, &dest_rect);
+	SDL_assert(render_texture_ok);
 }
 
 /////////
@@ -1286,7 +1336,7 @@ SDL_AppResult App::iterate() {
 #endif
 
 	settings.update(*storage);
-	launcher->update(realDeltaTime);
+	launcher->update(realTotalTime, realDeltaTime);
 
 	const bool set_color_ok = SDL_SetRenderDrawColorFloat(renderer, 0, 0, 0, 1);
 	SDL_assert(set_color_ok);
