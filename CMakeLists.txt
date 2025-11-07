@@ -3,8 +3,10 @@ set( CMAKE_CXX_STANDARD 20 )
 set( CMAKE_CXX_STANDARD_REQUIRED ON )
 set( CMAKE_CXX_SCAN_FOR_MODULES OFF )
 project( drunken_lobster_driving )
-set( BUILD_SHARED_LIBS OFF )
 
+option( CC_HAS_DEVUI "Enable Dev Ui" ON )
+
+set( BUILD_SHARED_LIBS OFF )
 set( SDL_STATIC ON )
 set( SDLIMAGE_AVIF OFF )
 set( SDLIMAGE_BMP OFF )
@@ -34,30 +36,32 @@ add_subdirectory( ext/freetype EXCLUDE_FROM_ALL )
 add_library( Freetype::Freetype ALIAS freetype )
 add_subdirectory( ext/RmlUi EXCLUDE_FROM_ALL )
 
-add_library( ImGui
-	ext/imgui/imconfig.h
-	ext/imgui/imgui.cpp
-	ext/imgui/imgui.h
-	ext/imgui/imgui_demo.cpp
-	ext/imgui/imgui_draw.cpp
-	ext/imgui/imgui_internal.h
-	ext/imgui/imgui_tables.cpp
-	ext/imgui/imgui_widgets.cpp
-	ext/imgui/imstb_rectpack.h
-	ext/imgui/imstb_textedit.h
-	ext/imgui/imstb_truetype.h
-)
-target_include_directories( ImGui PUBLIC ext/imgui )
-target_compile_definitions( ImGui PUBLIC IMGUI_DISABLE_OBSOLETE_FUNCTIONS )
+if ( CC_HAS_DEVUI )
+	add_library( ImGui
+		ext/imgui/imconfig.h
+		ext/imgui/imgui.cpp
+		ext/imgui/imgui.h
+		ext/imgui/imgui_demo.cpp
+		ext/imgui/imgui_draw.cpp
+		ext/imgui/imgui_internal.h
+		ext/imgui/imgui_tables.cpp
+		ext/imgui/imgui_widgets.cpp
+		ext/imgui/imstb_rectpack.h
+		ext/imgui/imstb_textedit.h
+		ext/imgui/imstb_truetype.h
+	)
+	target_include_directories( ImGui PUBLIC ext/imgui )
+	target_compile_definitions( ImGui PUBLIC IMGUI_DISABLE_OBSOLETE_FUNCTIONS )
 
-add_library( ImGuiBackend
-	ext/imgui/backends/imgui_impl_sdl3.cpp
-	ext/imgui/backends/imgui_impl_sdl3.h
-	ext/imgui/backends/imgui_impl_sdlrenderer3.cpp
-	ext/imgui/backends/imgui_impl_sdlrenderer3.h
-)
-target_include_directories( ImGuiBackend PUBLIC ext/imgui/backends )
-target_link_libraries( ImGuiBackend PUBLIC ImGui SDL3-static )
+	add_library( ImGuiBackend
+		ext/imgui/backends/imgui_impl_sdl3.cpp
+		ext/imgui/backends/imgui_impl_sdl3.h
+		ext/imgui/backends/imgui_impl_sdlrenderer3.cpp
+		ext/imgui/backends/imgui_impl_sdlrenderer3.h
+	)
+	target_include_directories( ImGuiBackend PUBLIC ext/imgui/backends )
+	target_link_libraries( ImGuiBackend PUBLIC ImGui SDL3-static )
+endif()
 
 add_library( tileson INTERFACE )
 target_include_directories( tileson INTERFACE ext/tileson )
@@ -70,4 +74,8 @@ target_link_libraries( RmlUiBackend PUBLIC RmlUi::RmlUi SDL3-static SDL3_image-s
 add_executable( drunken_lobster_driving src/game/game.cpp )
 target_include_directories( drunken_lobster_driving PUBLIC src/game )
 target_compile_definitions( drunken_lobster_driving PUBLIC GLM_ENABLE_EXPERIMENTAL SDL_ASSERT_LEVEL=2 )
-target_link_libraries( drunken_lobster_driving PUBLIC SDL_uclibc SDL3-static SDL3_image-static fmt glm nlohmann_json ImGuiBackend tileson RmlUiBackend )
+target_link_libraries( drunken_lobster_driving PUBLIC SDL_uclibc SDL3-static SDL3_image-static fmt glm nlohmann_json tileson RmlUiBackend )
+if ( CC_HAS_DEVUI )
+	target_link_libraries( drunken_lobster_driving PUBLIC ImGuiBackend )
+	target_compile_definitions( drunken_lobster_driving PUBLIC CC_HAS_DEVUI )
+endif()

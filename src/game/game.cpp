@@ -14,14 +14,16 @@
 #include <glm/gtx/compatibility.hpp>
 #include <glm/gtx/rotate_vector.hpp>
 #include <glm/gtx/vector_angle.hpp>
-#include <imgui.h>
-#include <imgui_impl_sdl3.h>
-#include <imgui_impl_sdlrenderer3.h>
 #include <memory>
 #include <nlohmann/json.hpp>
 #include <numbers>
 #include <string_view>
 #include <tileson.hpp>
+#ifdef CC_HAS_DEVUI
+#include <imgui.h>
+#include <imgui_impl_sdl3.h>
+#include <imgui_impl_sdlrenderer3.h>
+#endif
 
 using float2 = glm::vec2;
 using float4 = glm::vec4;
@@ -168,6 +170,7 @@ struct Settings {
 };
 
 void Settings::update(const Storage& storage) {
+#ifdef CC_HAS_DEVUI
 	if (ImGui::Begin("Settings")) {
 		ImGui::SetNextItemShortcut(ImGuiMod_Ctrl | ImGuiKey_R);
 		if (ImGui::Button("Reload") && storage.exists("settings.json")) {
@@ -226,6 +229,7 @@ void Settings::update(const Storage& storage) {
 		}
 	}
 	ImGui::End();
+#endif
 }
 
 /////////////
@@ -572,7 +576,8 @@ float2 Session::worldToRender(const float2 world_coords) const {
 void Session::update(const std::chrono::microseconds real_delta_time) {
 	bool debug_simulation = false;
 
-	//---------- Debug Ui ----------//
+#ifdef CC_HAS_DEVUI
+	//---------- Dev Ui ----------//
 
 	if (ImGui::Begin("Session")) {
 		if (ImGui::CollapsingHeader("Render", ImGuiTreeNodeFlags_DefaultOpen)) {
@@ -630,6 +635,7 @@ void Session::update(const std::chrono::microseconds real_delta_time) {
 		}
 	}
 	ImGui::End();
+#endif
 
 	//---------- Car ----------//
 
@@ -657,6 +663,7 @@ void Session::update(const std::chrono::microseconds real_delta_time) {
 		finishTime = sessionTotalTime;
 	}
 
+#ifdef CC_HAS_DEVUI
 	//---------- Stats ----------//
 
 	if (ImGui::Begin("Car Stats")) {
@@ -675,6 +682,7 @@ void Session::update(const std::chrono::microseconds real_delta_time) {
 		ImGui::EndDisabled();
 	}
 	ImGui::End();
+#endif
 }
 
 Session::CarStats Session::updateCarPerks(const std::chrono::microseconds delta_time) {
@@ -1166,7 +1174,7 @@ private:
 	std::unique_ptr<Content> content;
 	std::unique_ptr<Launcher> launcher;
 
-	bool showDebugUi = false;
+	bool showDevUi = false;
 	std::chrono::microseconds realTotalTime;
 	std::chrono::microseconds realDeltaTime;
 };
@@ -1184,6 +1192,7 @@ App::App(int argc, char* argv[]) {
 	const bool vsync_ok = SDL_SetRenderVSync(renderer, 1);
 	SDL_assert(vsync_ok);
 
+#ifdef CC_HAS_DEVUI
 	{
 		ImGuiContext* imgui_context = ImGui::CreateContext();
 		SDL_assert(imgui_context);
@@ -1203,6 +1212,7 @@ App::App(int argc, char* argv[]) {
 		const bool imgui_init2_ok = ImGui_ImplSDLRenderer3_Init(renderer);
 		SDL_assert(imgui_init2_ok);
 	}
+#endif
 
 	storage.reset(new Storage);
 
@@ -1239,18 +1249,23 @@ App::App(int argc, char* argv[]) {
 }
 
 SDL_AppResult App::processEvent(SDL_Event* event) {
-	if (showDebugUi) {
+#ifdef CC_HAS_DEVUI
+	if (showDevUi) {
 		ImGui_ImplSDL3_ProcessEvent(event);
 	}
+#endif
+
 	RmlSDL::InputEventHandler(uiContext, window, *event);
 
 	if (event->type == SDL_EVENT_QUIT) {
 		return SDL_APP_SUCCESS;
+#ifdef CC_HAS_DEVUI
 	} else if (event->type == SDL_EVENT_WINDOW_DISPLAY_SCALE_CHANGED) {
 		const float main_scale = SDL_GetWindowDisplayScale(window);
 		ImGui::GetStyle().FontScaleDpi = main_scale;
+#endif
 	} else if (event->type == SDL_EVENT_KEY_DOWN && event->key.scancode == SDL_SCANCODE_F1) {
-		showDebugUi = !showDebugUi;
+		showDevUi = !showDevUi;
 	} else if (event->type == SDL_EVENT_KEY_DOWN && event->key.scancode == SDL_SCANCODE_F12) {
 		Rml::Debugger::SetVisible(!Rml::Debugger::IsVisible());
 	}
@@ -1263,10 +1278,12 @@ SDL_AppResult App::iterate() {
 	realDeltaTime = now - realTotalTime;
 	realTotalTime = now;
 
+#ifdef CC_HAS_DEVUI
 	ImGui_ImplSDLRenderer3_NewFrame();
 	ImGui_ImplSDL3_NewFrame();
 	ImGui::NewFrame();
 	ImGui::DockSpaceOverViewport(0, nullptr, ImGuiDockNodeFlags_PassthruCentralNode);
+#endif
 
 	settings.update(*storage);
 	launcher->update(realDeltaTime);
@@ -1287,10 +1304,12 @@ SDL_AppResult App::iterate() {
 		SDL_assert(ui_render_ok);
 	}
 
+#ifdef CC_HAS_DEVUI
 	ImGui::Render();
-	if (showDebugUi) {
+	if (showDevUi) {
 		ImGui_ImplSDLRenderer3_RenderDrawData(ImGui::GetDrawData(), renderer);
 	}
+#endif
 
 	const bool present_ok = SDL_RenderPresent(renderer);
 	SDL_assert(present_ok);
@@ -1308,9 +1327,11 @@ App::~App() {
 
 	storage.reset();
 
+#ifdef CC_HAS_DEVUI
 	ImGui_ImplSDLRenderer3_Shutdown();
 	ImGui_ImplSDL3_Shutdown();
 	ImGui::DestroyContext();
+#endif
 
 	SDL_DestroyRenderer(renderer);
 	renderer = nullptr;
