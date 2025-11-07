@@ -358,7 +358,7 @@ public:
 	}
 
 	std::chrono::microseconds getSessionTime() {
-		return sessionTime;
+		return sessionTotalTime;
 	}
 
 	int getScore() const {
@@ -419,7 +419,7 @@ private:
 	std::unique_ptr<tson::Map> level;
 	std::vector<CellState> cells;
 
-	std::chrono::microseconds sessionTime;
+	std::chrono::microseconds sessionTotalTime;
 	std::optional<std::chrono::microseconds> finishTime;
 	bool paused = false;
 	float score = 0;
@@ -431,15 +431,15 @@ private:
 
 	CarStats updateCarPerks(const std::chrono::microseconds delta_time);
 	void updateCarDrive(const std::chrono::microseconds delta_time, const CarStats& car_stats);
-	void updateCarCollisions(const std::chrono::microseconds game_time, const CarStats& stats);
+	void updateCarCollisions(const std::chrono::microseconds total_time, const CarStats& stats);
 	bool isGameFinished() const;
 
-	void renderEntity(const float2& world_coords, const float world_size, SDL_Texture* texture, SDL_Renderer* renderer);
+	void renderEntity(const float2& world_coords, const float world_size, SDL_Texture* texture);
 	void renderGrid();
 };
 
 Session::Session(const Settings& _settings, const Content& _content, SDL_Window* _window, SDL_Renderer* _renderer, const std::filesystem::path& level_path)
-	: settings(_settings), content(_content), window(_window), renderer(_renderer), sessionTime(0) {
+	: settings(_settings), content(_content), window(_window), renderer(_renderer), sessionTotalTime(0) {
 
 	tson::Tileson parser(std::unique_ptr<tson::NlohmannJson>(new tson::NlohmannJson));
 	level = parser.parse(level_path);
@@ -569,7 +569,7 @@ float2 Session::worldToRender(const float2 world_coords) const {
 	return render_pos;
 }
 
-void Session::update(const std::chrono::microseconds delta_real_time) {
+void Session::update(const std::chrono::microseconds real_delta_time) {
 	bool debug_simulation = false;
 
 	//---------- Debug Ui ----------//
@@ -609,7 +609,7 @@ void Session::update(const std::chrono::microseconds delta_real_time) {
 					cell.destructed = 0;
 					cell.destructionTime = std::chrono::microseconds(0);
 				}
-				sessionTime = std::chrono::microseconds(0);
+				sessionTotalTime = std::chrono::microseconds(0);
 				finishTime.reset();
 				score = 0;
 			}
@@ -640,11 +640,11 @@ void Session::update(const std::chrono::microseconds delta_real_time) {
 			__debugbreak();
 		}
 
-		sessionTime += delta_real_time;
-		car_stats = updateCarPerks(delta_real_time);
-		updateCarDrive(delta_real_time, car_stats);
-		updateCarCollisions(sessionTime, car_stats);
-		cameraShaker.update(delta_real_time);
+		sessionTotalTime += real_delta_time;
+		car_stats = updateCarPerks(real_delta_time);
+		updateCarDrive(real_delta_time, car_stats);
+		updateCarCollisions(sessionTotalTime, car_stats);
+		cameraShaker.update(real_delta_time);
 	}
 
 	if (cameraFollowCar) {
@@ -654,7 +654,7 @@ void Session::update(const std::chrono::microseconds delta_real_time) {
 	//---------- End Game ----------//
 
 	if (!finishTime.has_value() && isGameFinished()) {
-		finishTime = sessionTime;
+		finishTime = sessionTotalTime;
 	}
 
 	//---------- Stats ----------//
@@ -665,7 +665,7 @@ void Session::update(const std::chrono::microseconds delta_real_time) {
 		ImGui::Text("Speed: %f", car_stats.speed);
 		ImGui::Text("Super Speed Duration: %d", carSuperSpeedDuration.count());
 		ImGui::Text("Perks: %d", carPerks.size());
-		ImGui::Text("Session Time: %.2fs", TimeUtils::microsecondsToFloatSeconds(sessionTime));
+		ImGui::Text("Session Total Time: %.2fs", TimeUtils::microsecondsToFloatSeconds(sessionTotalTime));
 		if (!finishTime.has_value()) {
 			ImGui::Text("Finish Time: none");
 		} else {
@@ -751,7 +751,7 @@ void Session::updateCarDrive(const std::chrono::microseconds delta_time, const C
 	}
 }
 
-void Session::updateCarCollisions(const std::chrono::microseconds game_time, const CarStats& stats) {
+void Session::updateCarCollisions(const std::chrono::microseconds total_time, const CarStats& stats) {
 	const float2 delta = carPosition - carPrevPosition;
 	int2 prev_tile = glm::floor(carPrevPosition);
 	int2 curr_tile = glm::floor(carPosition);
@@ -810,7 +810,7 @@ void Session::updateCarCollisions(const std::chrono::microseconds game_time, con
 
 		if (stats.mayhem >= building_settings->minMayhemToDestroy && stats.speed >= building_settings->minSpeedToDestroy) {
 			cell.destructed = true;
-			cell.destructionTime = game_time;
+			cell.destructionTime = total_time;
 			carPerks.emplace_back(CarPerk{.durationLeft = TimeUtils::floatSecondsToMicroseconds(building_settings->perkDuration), .mayhem = building_settings->perkMayhem});
 			carSuperSpeedDuration += TimeUtils::floatSecondsToMicroseconds(building_settings->superSpeedDuration);
 			cameraShaker.shake(building_settings->shake);
@@ -848,7 +848,7 @@ bool Session::isGameFinished() const {
 	return std::all_of(cells.begin(), cells.end(), [](const CellState& cell) { return cell.buildingType == BuildingType::None || cell.destructed; });
 }
 
-void Session::renderEntity(const float2& world_coords, const float world_size, SDL_Texture* texture, SDL_Renderer* renderer) {
+void Session::renderEntity(const float2& world_coords, const float world_size, SDL_Texture* texture) {
 	const float2 bottom_left = worldToRender(world_coords) + getRenderDirectionY() * world_size;
 	const float2 bottom_right = worldToRender(world_coords) + getRenderDirectionX() * world_size;
 	const float render_width = bottom_right.x - bottom_left.x;
@@ -865,7 +865,7 @@ void Session::render() {
 		for (int j = 0; j < worldSize.x; ++j) {
 			const CellState& cell = cells.at(i * worldSize.x + j);
 			SDL_Texture* ground_texture = content.groundFlipbook.textures.at(cell.groundTile);
-			renderEntity(float2(j, i) + float2(0.5f), 1, ground_texture, renderer);
+			renderEntity(float2(j, i) + float2(0.5f), 1, ground_texture);
 		}
 	}
 
@@ -874,7 +874,7 @@ void Session::render() {
 	for (int i = 0; i < worldSize.y; ++i) {
 		for (int j = 0; j < worldSize.x; ++j) {
 			const CellState& cell = cells.at(i * worldSize.x + j);
-			renderEntity(float2(j, i) + float2(0.5f), 1, cell.skidTexture, renderer);
+			renderEntity(float2(j, i) + float2(0.5f), 1, cell.skidTexture);
 		}
 	}
 
@@ -883,7 +883,7 @@ void Session::render() {
 		auto get_destructed_frame = [this](const CellState& cell, const Flipbook& flipbook) -> SDL_Texture* {
 			if (cell.destructed) {
 				const int usec_per_frame = 1000000 / 45;
-				const int frame = (sessionTime - cell.destructionTime).count() / usec_per_frame;
+				const int frame = (sessionTotalTime - cell.destructionTime).count() / usec_per_frame;
 				return flipbook.textures.at(std::clamp<int>(frame, 0, flipbook.textures.size() - 1));
 			} else {
 				return flipbook.textures.front();
@@ -897,7 +897,7 @@ void Session::render() {
 				//---------- Destroyed Building ----------//
 
 				if (cell.buildingType != BuildingType::None && cell.destructed) {
-					auto get_animation_frame = [session_time = sessionTime](const CellState& cell, const Flipbook& flipbook) -> SDL_Texture* {
+					auto get_animation_frame = [session_time = sessionTotalTime](const CellState& cell, const Flipbook& flipbook) -> SDL_Texture* {
 						if (cell.destructed) {
 							const int usec_per_frame = 1000000 / 45;
 							const int frame = (session_time - cell.destructionTime).count() / usec_per_frame;
@@ -921,7 +921,7 @@ void Session::render() {
 					}
 
 					SDL_assert(building_texture);
-					renderEntity(float2(j, i) + float2(0.5f), 1, building_texture, renderer);
+					renderEntity(float2(j, i) + float2(0.5f), 1, building_texture);
 				}
 
 				//---------- Car ----------//
@@ -931,14 +931,14 @@ void Session::render() {
 					const float pi2 = std::numbers::pi * 2;
 					const float rotation = car_rotation > 0 ? car_rotation : pi2 - std::fmod(-car_rotation, pi2);
 					const int frame = int(rotation / pi2 * content.carFlipbook.textures.size()) % content.carFlipbook.textures.size();
-					renderEntity(carPosition, settings.car.size, content.carFlipbook.textures.at(frame), renderer);
+					renderEntity(carPosition, settings.car.size, content.carFlipbook.textures.at(frame));
 				}
 
 				//---------- Non-Destroyed Building ----------//
 
 				if (cell.buildingType != BuildingType::None && !cell.destructed) {
 					SDL_Texture* building_texture = content.buildingsFlipbook.textures.at(cell.buildingTile);
-					renderEntity(float2(j, i) + float2(0.5f), 1, building_texture, renderer);
+					renderEntity(float2(j, i) + float2(0.5f), 1, building_texture);
 				}
 			}
 		}
@@ -1060,14 +1060,14 @@ Launcher::~Launcher() {
 	}
 }
 
-void Launcher::update(const std::chrono::microseconds delta_real_time) {
+void Launcher::update(const std::chrono::microseconds real_delta_time) {
 	for (auto& deferred_update_func : deferredUpdates) {
 		deferred_update_func();
 	}
 	deferredUpdates.clear();
 
 	if (session) {
-		session->update(delta_real_time);
+		session->update(real_delta_time);
 
 		score = session->getScore();
 		sessionModel.DirtyVariable("score");
@@ -1167,8 +1167,8 @@ private:
 	std::unique_ptr<Launcher> launcher;
 
 	bool showDebugUi = false;
-	std::chrono::microseconds currentTime;
-	std::chrono::microseconds deltaTime;
+	std::chrono::microseconds realTotalTime;
+	std::chrono::microseconds realDeltaTime;
 };
 
 App::App(int argc, char* argv[]) {
@@ -1235,7 +1235,7 @@ App::App(int argc, char* argv[]) {
 
 	content.reset(new Content(*storage, renderer));
 	launcher.reset(new Launcher(settings, *content, window, renderer, uiContext));
-	currentTime = std::chrono::microseconds(SDL_GetTicksNS() / 1000);
+	realTotalTime = std::chrono::microseconds(SDL_GetTicksNS() / 1000);
 }
 
 SDL_AppResult App::processEvent(SDL_Event* event) {
@@ -1260,8 +1260,8 @@ SDL_AppResult App::processEvent(SDL_Event* event) {
 
 SDL_AppResult App::iterate() {
 	const std::chrono::microseconds now(SDL_GetTicksNS() / 1000);
-	deltaTime = now - currentTime;
-	currentTime = now;
+	realDeltaTime = now - realTotalTime;
+	realTotalTime = now;
 
 	ImGui_ImplSDLRenderer3_NewFrame();
 	ImGui_ImplSDL3_NewFrame();
@@ -1269,7 +1269,7 @@ SDL_AppResult App::iterate() {
 	ImGui::DockSpaceOverViewport(0, nullptr, ImGuiDockNodeFlags_PassthruCentralNode);
 
 	settings.update(*storage);
-	launcher->update(deltaTime);
+	launcher->update(realDeltaTime);
 
 	const bool set_color_ok = SDL_SetRenderDrawColorFloat(renderer, 0, 0, 0, 1);
 	SDL_assert(set_color_ok);
