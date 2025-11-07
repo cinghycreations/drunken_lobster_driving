@@ -1305,6 +1305,15 @@ SDL_AppResult App::iterate() {
 	}
 
 #ifdef CC_HAS_DEVUI
+	if (ImGui::Begin("Frame Stats")) {
+		const std::chrono::microseconds frame_delta_time = std::chrono::microseconds(SDL_GetTicksNS() / 1000) - now;
+		ImGui::Text("Real Delta Time: %.3fms", TimeUtils::microsecondsToFloatSeconds(realDeltaTime) * 1000);
+		ImGui::Text("Frame Delta Time: %.3fms", TimeUtils::microsecondsToFloatSeconds(frame_delta_time) * 1000);
+	}
+	ImGui::End();
+#endif
+
+#ifdef CC_HAS_DEVUI
 	ImGui::Render();
 	if (showDevUi) {
 		ImGui_ImplSDLRenderer3_RenderDrawData(ImGui::GetDrawData(), renderer);
