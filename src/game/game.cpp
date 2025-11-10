@@ -23,6 +23,7 @@
 #include <imgui.h>
 #include <imgui_impl_sdl3.h>
 #include <imgui_impl_sdlrenderer3.h>
+#include <imgui_stdlib.h>
 #endif
 #ifdef CC_HAS_EMBED_CONTENT
 #include <cmrc/cmrc.hpp>
@@ -152,34 +153,41 @@ struct RenderSettings {
 
 struct CarSettings {
 	float size = 0.2f;
-	float baseSpeed = 0.1f;
-	float superSpeed = 0.2f;
 	float mouseSensibility = 0.01f;
 	float grip = 1;
+	float baseSpeed = 0.1f;
+	float speedMultiplierDecrease = 0.5f;
+	float scoreMultiplierDecrease = 0.5f;
 
-	NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(CarSettings, size, baseSpeed, superSpeed, mouseSensibility, grip);
+	NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(CarSettings, size, mouseSensibility, grip, baseSpeed, speedMultiplierDecrease, scoreMultiplierDecrease);
 };
 
 struct BuildingSettings {
-	float minMayhemToDestroy = 0;
-	float minSpeedToDestroy = 0;
-	float perkDuration = 0;
-	float perkMayhem = 0;
-	float superSpeedDuration = 0;
-	float scoreMultiplier = 1;
+	float speedMultiplierBonus = 0;
+	float blastMultiplierBonus = 0;
+	float baseBlast = 0;
 	ShakeSettings shake;
 
-	NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(BuildingSettings, minMayhemToDestroy, minSpeedToDestroy, perkMayhem, perkDuration, superSpeedDuration, scoreMultiplier, shake);
+	NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(BuildingSettings, speedMultiplierBonus, blastMultiplierBonus, baseBlast, shake);
 };
 
 struct GameplaySettings {
+	std::array<std::string, 5> blastCategories = {"Lame Lobster", "Annoying Lobster", "Infamous Lobster", "Terrorist Lobster", "Worst Lobster Ever"};
 	BuildingSettings garden;
 	BuildingSettings house;
 	BuildingSettings gaspump;
 	BuildingSettings skyscraper;
 	BuildingSettings nuclear;
 
-	NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(GameplaySettings, garden, house, gaspump, skyscraper, nuclear);
+	NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(GameplaySettings, blastCategories, garden, house, gaspump, skyscraper, nuclear);
+};
+
+struct LevelSettings {
+	std::string name;
+	std::string path;
+	std::array<float, 5> blastCategoryThresholds = {0, 1, 2, 3, 4};
+
+	NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(LevelSettings, name, path, blastCategoryThresholds);
 };
 
 struct Settings {
@@ -187,10 +195,11 @@ struct Settings {
 	CameraSettings camera;
 	CarSettings car;
 	GameplaySettings gameplay;
+	std::vector<LevelSettings> levels = {LevelSettings{.name = "Testbed", .path = "levels/testbed.tmj"}};
 
 	void update(const Storage& storage);
 
-	NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(Settings, camera, car, gameplay);
+	NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(Settings, camera, car, gameplay, levels);
 };
 
 void Settings::update(const Storage& storage) {
@@ -224,13 +233,20 @@ void Settings::update(const Storage& storage) {
 
 		if (ImGui::CollapsingHeader("Car", ImGuiTreeNodeFlags_DefaultOpen)) {
 			ImGui::DragFloat("Size", &car.size, 0.01f, 0.01f, 5);
-			ImGui::DragFloat("Base Speed", &car.baseSpeed, 0.01f);
-			ImGui::DragFloat("Super Speed", &car.superSpeed, 0.01f);
 			ImGui::DragFloat("Mouse Sensibility", &car.mouseSensibility, 0.01f);
 			ImGui::SliderFloat("Grip", &car.grip, 0, 1);
+			ImGui::DragFloat("Base Speed", &car.baseSpeed, 0.01f);
+			ImGui::DragFloat("Speed Multiplier Decrease", &car.speedMultiplierDecrease, 0.01f);
+			ImGui::DragFloat("Score Multiplier Decrease", &car.scoreMultiplierDecrease, 0.01f);
 		}
 
 		if (ImGui::CollapsingHeader("Gameplay", ImGuiTreeNodeFlags_DefaultOpen)) {
+			for (int category = 0; category < gameplay.blastCategories.size(); ++category) {
+				const std::string caption = fmt::format("Blast Category {}", category);
+				ImGui::InputText(caption.c_str(), &gameplay.blastCategories.at(category));
+			}
+			ImGui::Separator();
+
 			const std::array<std::pair<const char*, BuildingSettings*>, 5> entries = {{
 				{"Garden", &gameplay.garden},
 				{"House", &gameplay.house},
@@ -242,17 +258,36 @@ void Settings::update(const Storage& storage) {
 			for (const auto& entry : entries) {
 				ImGui::PushID(entry.first);
 				ImGui::Text("%s", entry.first);
-				ImGui::DragFloat("Min Mayhem To Destroy", &entry.second->minMayhemToDestroy, 0.01f);
-				ImGui::DragFloat("Min Speed To Destroy", &entry.second->minSpeedToDestroy, 0.01f);
-				ImGui::DragFloat("Perk Duration", &entry.second->perkDuration, 0.01f);
-				ImGui::DragFloat("Perk Mayhem", &entry.second->perkMayhem, 0.01f);
-				ImGui::DragFloat("SuperSpeed Duration", &entry.second->superSpeedDuration, 0.01f);
-				ImGui::DragFloat("Score Multiplier", &entry.second->scoreMultiplier, 0.01f);
+				ImGui::DragFloat("Speed Multiplier Bonus", &entry.second->speedMultiplierBonus, 0.01f);
+				ImGui::DragFloat("Score Multiplier Bonus", &entry.second->blastMultiplierBonus, 0.01f);
+				ImGui::DragFloat("Base Blast", &entry.second->baseBlast, 0.01f);
 				ImGui::DragFloat("Shake Time", &entry.second->shake.shakeTime, 0.01f);
 				ImGui::DragFloat("Shake Period", &entry.second->shake.shakePeriod, 0.01f);
 				ImGui::DragFloat("Shake Strength", &entry.second->shake.shakeStrength, 0.01f);
 				ImGui::Separator();
 				ImGui::PopID();
+			}
+		}
+
+		if (ImGui::CollapsingHeader("Levels", ImGuiTreeNodeFlags_DefaultOpen)) {
+			for (int level = 0; level < levels.size(); ++level) {
+				ImGui::PushID(level);
+				ImGui::Text("Level %d", level);
+				ImGui::InputText("Name", &levels.at(level).name);
+				ImGui::InputText("Path", &levels.at(level).path);
+				for (int category = 0; category < levels.at(level).blastCategoryThresholds.size(); ++category) {
+					const std::string caption = fmt::format("Blast Category Threshold {}", category);
+					ImGui::DragFloat(caption.c_str(), &levels.at(level).blastCategoryThresholds.at(category), 0.01f);
+				}
+				ImGui::Separator();
+				ImGui::PopID();
+			}
+			if (ImGui::Button("Add")) {
+				levels.emplace_back();
+			}
+			ImGui::SameLine();
+			if (ImGui::Button("Delete") && levels.size() > 0) {
+				levels.pop_back();
 			}
 		}
 	}
@@ -375,7 +410,7 @@ float2 CameraShaker::shakeSinusoidal(const float time, const float period) {
 
 class Session {
 public:
-	Session(const Settings& _settings, const Storage& _storage, const Content& _content, SDL_Window* _window, SDL_Renderer* _renderer, const std::filesystem::path& level_path);
+	Session(const Settings& _settings, const Storage& _storage, const Content& _content, SDL_Window* _window, SDL_Renderer* _renderer, const int level_index);
 	~Session();
 
 	void update(const std::chrono::microseconds delta_real_time);
@@ -389,6 +424,8 @@ public:
 		return paused;
 	}
 
+	void restart();
+
 	std::chrono::microseconds getSessionTime() {
 		return sessionTotalTime;
 	}
@@ -397,9 +434,15 @@ public:
 		return countdownTime;
 	}
 
-	int getScore() const {
-		return score;
+	float getSpeedMultiplier() const {
+		return carStats.speedMultiplier;
 	}
+
+	float getBlastMultiplier() const {
+		return carStats.blastMultiplier;
+	}
+
+	const std::string& getBlastCategory() const;
 
 private:
 	enum class BuildingType {
@@ -421,14 +464,11 @@ private:
 		SDL_Texture* skidTexture;
 	};
 
-	struct CarPerk {
-		std::chrono::microseconds durationLeft;
-		float mayhem;
-	};
-
 	struct CarStats {
-		float mayhem;
-		float speed;
+		float speedMultiplier = 1;
+		float blastMultiplier = 1;
+		float totalBlast = 0;
+		float bestBlast = 0;
 	};
 
 	const Settings& settings;
@@ -436,6 +476,7 @@ private:
 	const Content& content;
 	SDL_Window* window;
 	SDL_Renderer* renderer;
+	int levelIndex;
 	int2 worldSize;
 	float2 worldStartingPosition = {0.5f, 0.5f};
 	bool renderEnableGrid = false;
@@ -444,14 +485,13 @@ private:
 	CameraShaker cameraShaker;
 	bool inputCaptureMouse = false;
 
+	CarStats carStats;
+
 	float2 carPrevPosition = {0.5f, 0.5f};
 	float2 carPosition = {0.5f, 0.5f};
 	float2 carForwardDirection = {1, 0};
 	float2 carSteerDirection = {1, 0};
 	bool carSkid = false;
-
-	std::list<CarPerk> carPerks;
-	std::chrono::microseconds carSuperSpeedDuration;
 
 	std::unique_ptr<tson::Map> level;
 	std::vector<CellState> cells;
@@ -460,24 +500,25 @@ private:
 	std::chrono::microseconds sessionTotalTime;
 	std::optional<std::chrono::microseconds> finishTime;
 	bool paused = false;
-	float score = 0;
 
 	float2 getRenderTileSize() const;
 	float2 getRenderDirectionX() const;
 	float2 getRenderDirectionY() const;
 	float2 worldToRender(const float2 world_coords) const;
 
-	CarStats updateCarPerks(const std::chrono::microseconds delta_time);
-	void updateCarDrive(const std::chrono::microseconds delta_time, const CarStats& car_stats);
-	void updateCarCollisions(const std::chrono::microseconds total_time, const CarStats& stats);
+	void updateCarStats(const std::chrono::microseconds delta_time);
+	void updateCarDrive(const std::chrono::microseconds delta_time);
+	void updateCarCollisions(const std::chrono::microseconds total_time);
 	bool isGameFinished() const;
 
 	void renderEntity(const float2& world_coords, const float world_size, SDL_Texture* texture);
 	void renderGrid();
 };
 
-Session::Session(const Settings& _settings, const Storage& _storage, const Content& _content, SDL_Window* _window, SDL_Renderer* _renderer, const std::filesystem::path& level_path)
-	: settings(_settings), storage(_storage), content(_content), window(_window), renderer(_renderer), carSuperSpeedDuration(0), countdownTime(3000000 - 1), sessionTotalTime(0) {
+Session::Session(const Settings& _settings, const Storage& _storage, const Content& _content, SDL_Window* _window, SDL_Renderer* _renderer, const int level_index)
+	: settings(_settings), storage(_storage), content(_content), window(_window), renderer(_renderer), levelIndex(level_index), countdownTime(3000000 - 1), sessionTotalTime(0) {
+
+	const std::filesystem::path level_path = settings.levels.at(level_index).path;
 
 	SDL_IOStream* level_stream = storage.open(level_path);
 	size_t level_data_size = 0;
@@ -642,20 +683,8 @@ void Session::update(const std::chrono::microseconds real_delta_time) {
 
 		if (ImGui::CollapsingHeader("Car", ImGuiTreeNodeFlags_DefaultOpen)) {
 			ImGui::SetNextItemShortcut(ImGuiMod_Ctrl | ImGuiKey_H);
-			if (ImGui::Button("Return Home")) {
-				carPosition = worldStartingPosition;
-				carForwardDirection = {1, 0};
-				carSteerDirection = {1, 0};
-				carSkid = false;
-				carPerks.clear();
-				carSuperSpeedDuration = std::chrono::microseconds(0);
-				for (CellState& cell : cells) {
-					cell.destructed = 0;
-					cell.destructionTime = std::chrono::microseconds(0);
-				}
-				sessionTotalTime = std::chrono::microseconds(0);
-				finishTime.reset();
-				score = 0;
+			if (ImGui::Button("Restart")) {
+				restart();
 			}
 			ImGui::SameLine();
 			ImGui::SetNextItemShortcut(ImGuiMod_Ctrl | ImGuiKey_D);
@@ -678,8 +707,6 @@ void Session::update(const std::chrono::microseconds real_delta_time) {
 
 	//---------- Car ----------//
 
-	CarStats car_stats{.mayhem = 0, .speed = 0};
-
 	if (!paused) {
 		if (debug_simulation) {
 			SDL_TriggerBreakpoint();
@@ -693,9 +720,9 @@ void Session::update(const std::chrono::microseconds real_delta_time) {
 
 		if (countdownTime.count() == 0) {
 			sessionTotalTime += real_delta_time;
-			car_stats = updateCarPerks(real_delta_time);
-			updateCarDrive(real_delta_time, car_stats);
-			updateCarCollisions(sessionTotalTime, car_stats);
+			updateCarStats(real_delta_time);
+			updateCarDrive(real_delta_time);
+			updateCarCollisions(sessionTotalTime);
 			cameraShaker.update(real_delta_time);
 		}
 	}
@@ -715,49 +742,30 @@ void Session::update(const std::chrono::microseconds real_delta_time) {
 
 	if (ImGui::Begin("Car Stats")) {
 		ImGui::BeginDisabled(paused);
-		ImGui::Text("Mayhem: %f", car_stats.mayhem);
-		ImGui::Text("Speed: %f", car_stats.speed);
-		ImGui::Text("Super Speed Duration: %d", carSuperSpeedDuration.count());
-		ImGui::Text("Perks: %d", carPerks.size());
+		ImGui::Text("Speed Multiplier: %f", carStats.speedMultiplier);
+		ImGui::Text("Score Multiplier: %f", carStats.blastMultiplier);
+		ImGui::Text("Total Blast: %f", carStats.totalBlast);
+		ImGui::Text("Best Blast: %f", carStats.bestBlast);
 		ImGui::Text("Session Total Time: %.2fs", TimeUtils::microsecondsToFloatSeconds(sessionTotalTime));
 		if (!finishTime.has_value()) {
 			ImGui::Text("Finish Time: none");
 		} else {
 			ImGui::Text("Finish Time: %.2fs", TimeUtils::microsecondsToFloatSeconds(*finishTime));
 		}
-		ImGui::Text("Score: %f", score);
 		ImGui::EndDisabled();
 	}
 	ImGui::End();
 #endif
 }
 
-Session::CarStats Session::updateCarPerks(const std::chrono::microseconds delta_time) {
-	CarStats stats;
-
-	stats.mayhem = 0;
-	for (auto perk_iter = carPerks.begin(); perk_iter != carPerks.end();) {
-		if (perk_iter->durationLeft < delta_time) {
-			perk_iter = carPerks.erase(perk_iter);
-		} else {
-			perk_iter->durationLeft -= delta_time;
-			stats.mayhem += perk_iter->mayhem;
-			++perk_iter;
-		}
-	}
-
-	if (carSuperSpeedDuration > delta_time) {
-		stats.speed = settings.car.superSpeed;
-		carSuperSpeedDuration -= delta_time;
-	} else {
-		stats.speed = settings.car.baseSpeed;
-		carSuperSpeedDuration = std::chrono::microseconds(0);
-	}
-
-	return stats;
+void Session::updateCarStats(const std::chrono::microseconds delta_time) {
+	carStats.blastMultiplier -= settings.car.scoreMultiplierDecrease * TimeUtils::microsecondsToFloatSeconds(delta_time);
+	carStats.blastMultiplier = std::clamp<float>(carStats.blastMultiplier, 1, FLT_MAX);
+	carStats.speedMultiplier -= settings.car.speedMultiplierDecrease * TimeUtils::microsecondsToFloatSeconds(delta_time);
+	carStats.speedMultiplier = std::clamp<float>(carStats.speedMultiplier, 1, FLT_MAX);
 }
 
-void Session::updateCarDrive(const std::chrono::microseconds delta_time, const CarStats& car_stats) {
+void Session::updateCarDrive(const std::chrono::microseconds delta_time) {
 	carPrevPosition = carPosition;
 
 	float mouse_delta_x;
@@ -771,7 +779,7 @@ void Session::updateCarDrive(const std::chrono::microseconds delta_time, const C
 	const float max_angle = glm::radians(settings.car.grip * 360) * delta_secs;
 	carSkid = std::fabs(wanted_angle) >= max_angle;
 	carForwardDirection = glm::rotate(carForwardDirection, std::clamp(wanted_angle, -max_angle, max_angle));
-	carPosition += carForwardDirection * car_stats.speed * delta_secs;
+	carPosition += carForwardDirection * (settings.car.baseSpeed * carStats.speedMultiplier) * delta_secs;
 
 	if (carSkid) {
 		const int2 car_tile = carPosition;
@@ -806,7 +814,7 @@ void Session::updateCarDrive(const std::chrono::microseconds delta_time, const C
 	}
 }
 
-void Session::updateCarCollisions(const std::chrono::microseconds total_time, const CarStats& stats) {
+void Session::updateCarCollisions(const std::chrono::microseconds total_time) {
 	const float2 delta = carPosition - carPrevPosition;
 	int2 prev_tile = glm::floor(carPrevPosition);
 	int2 curr_tile = glm::floor(carPosition);
@@ -863,17 +871,15 @@ void Session::updateCarCollisions(const std::chrono::microseconds total_time, co
 			building_settings = &settings.gameplay.nuclear;
 		}
 
-		if (stats.mayhem >= building_settings->minMayhemToDestroy && stats.speed >= building_settings->minSpeedToDestroy) {
-			cell.destructed = true;
-			cell.destructionTime = total_time;
-			carPerks.emplace_back(CarPerk{.durationLeft = TimeUtils::floatSecondsToMicroseconds(building_settings->perkDuration), .mayhem = building_settings->perkMayhem});
-			carSuperSpeedDuration += TimeUtils::floatSecondsToMicroseconds(building_settings->superSpeedDuration);
-			cameraShaker.shake(building_settings->shake);
+		cell.destructed = true;
+		cell.destructionTime = total_time;
 
-			score += stats.mayhem * stats.speed * building_settings->scoreMultiplier;
-		} else {
-			bouncing = true;
-		}
+		carStats.speedMultiplier += building_settings->speedMultiplierBonus;
+		carStats.blastMultiplier += building_settings->blastMultiplierBonus;
+		const float blast = carStats.blastMultiplier * building_settings->baseBlast;
+		carStats.totalBlast += blast;
+		carStats.bestBlast = std::max(carStats.bestBlast, blast);
+		cameraShaker.shake(building_settings->shake);
 	} while (false);
 
 	if (bouncing) {
@@ -901,6 +907,23 @@ void Session::updateCarCollisions(const std::chrono::microseconds total_time, co
 
 bool Session::isGameFinished() const {
 	return std::all_of(cells.begin(), cells.end(), [](const CellState& cell) { return cell.buildingType == BuildingType::None || cell.destructed; });
+}
+
+void Session::restart() {
+	carPosition = worldStartingPosition;
+	carPrevPosition = carPosition;
+	carForwardDirection = {1, 0};
+	carSteerDirection = {1, 0};
+	carSkid = false;
+	carStats = {};
+	for (CellState& cell : cells) {
+		cell.destructed = 0;
+		cell.destructionTime = std::chrono::microseconds(0);
+	}
+	countdownTime = std::chrono::microseconds(3000000 - 1);
+	sessionTotalTime = std::chrono::microseconds(0);
+	finishTime.reset();
+	paused = false;
 }
 
 void Session::renderEntity(const float2& world_coords, const float world_size, SDL_Texture* texture) {
@@ -1023,6 +1046,22 @@ void Session::renderGrid() {
 	}
 }
 
+const std::string& Session::getBlastCategory() const {
+	SDL_assert(!settings.levels.at(levelIndex).blastCategoryThresholds.empty());
+	SDL_assert(settings.levels.at(levelIndex).blastCategoryThresholds.size() == settings.gameplay.blastCategories.size());
+	SDL_assert(settings.levels.at(levelIndex).blastCategoryThresholds.front() == 0);
+
+	int selected_category = 0;
+	for (int category = 1; category < settings.levels.at(levelIndex).blastCategoryThresholds.size(); ++category) {
+		const float threshold = settings.levels.at(levelIndex).blastCategoryThresholds.at(category);
+		if (carStats.bestBlast >= threshold) {
+			selected_category = category;
+		}
+	}
+
+	return settings.gameplay.blastCategories.at(selected_category);
+}
+
 //////////////
 // Launcher //
 //////////////
@@ -1092,10 +1131,9 @@ private:
 	Rml::DataModelHandle sessionModel;
 	std::string buildVersion = "v0";
 	std::string buildDate = __DATE__ " " __TIME__;
-	int mayhem = 0;
-	int speed = 0;
-	std::string time;
-	int score = 0;
+	std::string speedMultiplier;
+	std::string blastMultiplier;
+	std::string blastCategory;
 	int countdown = 0;
 
 	Rml::ElementDocument* document = nullptr;
@@ -1120,6 +1158,7 @@ private:
 	void quit(Rml::DataModelHandle handle, Rml::Event& event, const Rml::VariantList& params);
 	void pauseSession(Rml::DataModelHandle handle, Rml::Event& event, const Rml::VariantList& params);
 	void resumeSession(Rml::DataModelHandle handle, Rml::Event& event, const Rml::VariantList& params);
+	void restartSession(Rml::DataModelHandle handle, Rml::Event& event, const Rml::VariantList& params);
 	void exitSession(Rml::DataModelHandle handle, Rml::Event& event, const Rml::VariantList& params);
 
 	void renderBackground();
@@ -1146,11 +1185,11 @@ Launcher::Launcher(const Settings& _settings, const Storage& _storage, Content& 
 		Rml::DataModelConstructor session_model_ctor = uiContext->CreateDataModel("session");
 		session_model_ctor.BindEventCallback("pauseSession", &Launcher::pauseSession, this);
 		session_model_ctor.BindEventCallback("resumeSession", &Launcher::resumeSession, this);
+		session_model_ctor.BindEventCallback("restartSession", &Launcher::restartSession, this);
 		session_model_ctor.BindEventCallback("exitSession", &Launcher::exitSession, this);
-		session_model_ctor.Bind("mayhem", &mayhem);
-		session_model_ctor.Bind("speed", &speed);
-		session_model_ctor.Bind("time", &time);
-		session_model_ctor.Bind("score", &score);
+		session_model_ctor.Bind("speedMultiplier", &speedMultiplier);
+		session_model_ctor.Bind("blastMultiplier", &blastMultiplier);
+		session_model_ctor.Bind("blastCategory", &blastCategory);
 		session_model_ctor.Bind("countdown", &countdown);
 		sessionModel = session_model_ctor.GetModelHandle();
 	}
@@ -1185,11 +1224,14 @@ void Launcher::update(const std::chrono::microseconds real_total_time, const std
 	if (session) {
 		session->update(real_delta_time);
 
-		score = session->getScore();
-		sessionModel.DirtyVariable("score");
+		speedMultiplier = fmt::format("{:.02f}", session->getSpeedMultiplier());
+		sessionModel.DirtyVariable("speedMultiplier");
 
-		time = TimeUtils::microsecondsToString(session->getSessionTime());
-		sessionModel.DirtyVariable("time");
+		blastMultiplier = fmt::format("{:.02f}", session->getBlastMultiplier());
+		sessionModel.DirtyVariable("blastMultiplier");
+
+		blastCategory = session->getBlastCategory();
+		sessionModel.DirtyVariable("blastCategory");
 
 		countdown = (session->getCountdownTime().count() + 999999) / 1000000;
 		sessionModel.DirtyVariable("countdown");
@@ -1219,7 +1261,7 @@ void Launcher::goToPage(const std::string& page) {
 
 void Launcher::createSession() {
 	session.reset();
-	session.reset(new Session(settings, storage, content, window, renderer, "levels/testbed.tmj"));
+	session.reset(new Session(settings, storage, content, window, renderer, 0));
 }
 
 void Launcher::destroySession() {
@@ -1259,6 +1301,11 @@ void Launcher::pauseSession(Rml::DataModelHandle handle, Rml::Event& event, cons
 void Launcher::resumeSession(Rml::DataModelHandle handle, Rml::Event& event, const Rml::VariantList& params) {
 	deferredUpdates.emplace_back(std::bind(&Launcher::goToPage, this, "ui/ingame.html"));
 	deferredUpdates.emplace_back([this]() { session->pause(false); });
+}
+
+void Launcher::restartSession(Rml::DataModelHandle handle, Rml::Event& event, const Rml::VariantList& params) {
+	deferredUpdates.emplace_back(std::bind(&Launcher::goToPage, this, "ui/ingame.html"));
+	deferredUpdates.emplace_back([this]() { session->restart(); });
 }
 
 void Launcher::exitSession(Rml::DataModelHandle handle, Rml::Event& event, const Rml::VariantList& params) {

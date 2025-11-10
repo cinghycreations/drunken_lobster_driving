@@ -50,8 +50,10 @@ if ( CC_HAS_DEVUI )
 		ext/imgui/imstb_rectpack.h
 		ext/imgui/imstb_textedit.h
 		ext/imgui/imstb_truetype.h
+		ext/imgui/misc/cpp/imgui_stdlib.h
+		ext/imgui/misc/cpp/imgui_stdlib.cpp
 	)
-	target_include_directories( ImGui PUBLIC ext/imgui )
+	target_include_directories( ImGui PUBLIC ext/imgui ext/imgui/misc/cpp )
 	target_compile_definitions( ImGui PUBLIC IMGUI_DISABLE_OBSOLETE_FUNCTIONS )
 
 	add_library( ImGuiBackend
