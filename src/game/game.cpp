@@ -125,17 +125,21 @@ void Storage::saveJson(const std::filesystem::path& path, const nlohmann::json& 
 //////////////
 
 struct ShakeSettings {
-	float shakeTime = 0.5f;
-	float shakePeriod = 0.1f;
-	float shakeStrength = 0.2f;
+	float durationBase = 0.5f;
+	float durationCoeff = 0.1f;
+	float periodBase = 0.1f;
+	float periodCoeff = 0.1f;
+	float strengthBase = 0.2f;
+	float strengthCoeff = 0.2f;
 
-	NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(ShakeSettings, shakeTime, shakePeriod, shakeStrength);
+	NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(ShakeSettings, durationBase, durationCoeff, periodBase, periodCoeff, strengthBase, strengthCoeff);
 };
 
 struct CameraSettings {
 	float zoom = 1;
+	ShakeSettings shake;
 
-	NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(CameraSettings, zoom);
+	NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(CameraSettings, zoom, shake);
 };
 
 struct RenderSettings {
@@ -166,9 +170,8 @@ struct BuildingSettings {
 	float speedMultiplierBonus = 0;
 	float blastMultiplierBonus = 0;
 	float baseBlast = 0;
-	ShakeSettings shake;
 
-	NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(BuildingSettings, speedMultiplierBonus, blastMultiplierBonus, baseBlast, shake);
+	NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(BuildingSettings, speedMultiplierBonus, blastMultiplierBonus, baseBlast);
 };
 
 struct GameplaySettings {
@@ -229,6 +232,12 @@ void Settings::update(const Storage& storage) {
 
 		if (ImGui::CollapsingHeader("Camera", ImGuiTreeNodeFlags_DefaultOpen)) {
 			ImGui::DragFloat("Zoom", &camera.zoom, 0.01f, 0.01f, 10);
+			ImGui::DragFloat("Shake Time Base", &camera.shake.durationBase, 0.01f);
+			ImGui::DragFloat("Shake Time Factor", &camera.shake.durationCoeff, 0.01f);
+			ImGui::DragFloat("Shake Period Base", &camera.shake.periodBase, 0.01f);
+			ImGui::DragFloat("Shake Period Factor", &camera.shake.periodCoeff, 0.01f);
+			ImGui::DragFloat("Shake Strength Base", &camera.shake.strengthBase, 0.01f);
+			ImGui::DragFloat("Shake Strength Factor", &camera.shake.strengthCoeff, 0.01f);
 		}
 
 		if (ImGui::CollapsingHeader("Car", ImGuiTreeNodeFlags_DefaultOpen)) {
@@ -261,9 +270,6 @@ void Settings::update(const Storage& storage) {
 				ImGui::DragFloat("Speed Multiplier Bonus", &entry.second->speedMultiplierBonus, 0.01f);
 				ImGui::DragFloat("Score Multiplier Bonus", &entry.second->blastMultiplierBonus, 0.01f);
 				ImGui::DragFloat("Base Blast", &entry.second->baseBlast, 0.01f);
-				ImGui::DragFloat("Shake Time", &entry.second->shake.shakeTime, 0.01f);
-				ImGui::DragFloat("Shake Period", &entry.second->shake.shakePeriod, 0.01f);
-				ImGui::DragFloat("Shake Strength", &entry.second->shake.shakeStrength, 0.01f);
 				ImGui::Separator();
 				ImGui::PopID();
 			}
@@ -365,7 +371,7 @@ Content::Content(Storage& _storage, SDL_Renderer* renderer)
 
 class CameraShaker {
 public:
-	void shake(const ShakeSettings& shake_settings);
+	void shake(const float _duration, const float _period, const float _strength);
 	void update(const std::chrono::microseconds& delta_time);
 
 	float2 getMovement() const {
@@ -383,11 +389,11 @@ private:
 	static float2 shakeSinusoidal(const float time, const float period);
 };
 
-void CameraShaker::shake(const ShakeSettings& shake_settings) {
-	maxDuration = TimeUtils::floatSecondsToMicroseconds(shake_settings.shakeTime);
+void CameraShaker::shake(const float _duration, const float _period, const float _strength) {
+	maxDuration = TimeUtils::floatSecondsToMicroseconds(_duration);
 	durationLeft = maxDuration;
-	period = shake_settings.shakePeriod;
-	strength = shake_settings.shakeStrength;
+	period = _period;
+	strength = _strength;
 }
 
 void CameraShaker::update(const std::chrono::microseconds& delta_time) {
@@ -416,9 +422,7 @@ public:
 	void update(const std::chrono::microseconds delta_real_time);
 	void render();
 
-	void pause(const bool _paused) {
-		paused = _paused;
-	}
+	void pause(const bool _paused);
 
 	bool isPaused() const {
 		return paused;
@@ -483,7 +487,6 @@ private:
 	float2 cameraPosition = {0, 0};
 	bool cameraFollowCar = true;
 	CameraShaker cameraShaker;
-	bool inputCaptureMouse = false;
 
 	CarStats carStats;
 
@@ -615,6 +618,11 @@ Session::Session(const Settings& _settings, const Storage& _storage, const Conte
 		worldStartingPosition = float2(level->getProp("startX")->getValue<int>(), level->getProp("startY")->getValue<int>()) + float2(0.5f);
 	}
 	carPosition = worldStartingPosition;
+
+	{
+		const bool mouse_mode_ok = SDL_SetWindowRelativeMouseMode(window, true);
+		SDL_assert(mouse_mode_ok);
+	}
 }
 
 Session::~Session() {
@@ -673,14 +681,6 @@ void Session::update(const std::chrono::microseconds real_delta_time) {
 			ImGui::EndDisabled();
 		}
 
-		if (ImGui::CollapsingHeader("Input", ImGuiTreeNodeFlags_DefaultOpen)) {
-			ImGui::SetNextItemShortcut(ImGuiMod_Ctrl | ImGuiKey_M);
-			if (ImGui::Checkbox("Capture Mouse", &inputCaptureMouse)) {
-				const bool mouse_mode_ok = SDL_SetWindowRelativeMouseMode(window, inputCaptureMouse);
-				SDL_assert(mouse_mode_ok);
-			}
-		}
-
 		if (ImGui::CollapsingHeader("Car", ImGuiTreeNodeFlags_DefaultOpen)) {
 			ImGui::SetNextItemShortcut(ImGuiMod_Ctrl | ImGuiKey_H);
 			if (ImGui::Button("Restart")) {
@@ -692,8 +692,9 @@ void Session::update(const std::chrono::microseconds real_delta_time) {
 				debug_simulation = true;
 			}
 			ImGui::SetNextItemShortcut(ImGuiMod_Ctrl | ImGuiKey_P);
-			ImGui::Checkbox("Pause", &paused);
-
+			if (ImGui::Button("Pause/Unpause")) {
+				pause(!isPaused());
+			}
 			ImGui::BeginDisabled(!(paused));
 			ImGui::DragFloat2("Position##Car", &carPosition.x, 0.01f);
 			ImGui::DragFloat2("Forward", &carForwardDirection.x, 0.01f);
@@ -879,7 +880,10 @@ void Session::updateCarCollisions(const std::chrono::microseconds total_time) {
 		const float blast = carStats.blastMultiplier * building_settings->baseBlast;
 		carStats.totalBlast += blast;
 		carStats.bestBlast = std::max(carStats.bestBlast, blast);
-		cameraShaker.shake(building_settings->shake);
+
+		cameraShaker.shake(settings.camera.shake.durationBase + settings.camera.shake.durationCoeff * blast,
+						   settings.camera.shake.periodBase + settings.camera.shake.periodCoeff * blast,
+						   settings.camera.shake.strengthBase + settings.camera.shake.strengthCoeff * blast);
 	} while (false);
 
 	if (bouncing) {
@@ -909,6 +913,13 @@ bool Session::isGameFinished() const {
 	return std::all_of(cells.begin(), cells.end(), [](const CellState& cell) { return cell.buildingType == BuildingType::None || cell.destructed; });
 }
 
+void Session::pause(const bool _paused) {
+	paused = _paused;
+
+	const bool mouse_mode_ok = SDL_SetWindowRelativeMouseMode(window, !paused);
+	SDL_assert(mouse_mode_ok);
+}
+
 void Session::restart() {
 	carPosition = worldStartingPosition;
 	carPrevPosition = carPosition;
@@ -924,6 +935,9 @@ void Session::restart() {
 	sessionTotalTime = std::chrono::microseconds(0);
 	finishTime.reset();
 	paused = false;
+
+	const bool mouse_mode_ok = SDL_SetWindowRelativeMouseMode(window, !paused);
+	SDL_assert(mouse_mode_ok);
 }
 
 void Session::renderEntity(const float2& world_coords, const float world_size, SDL_Texture* texture) {
