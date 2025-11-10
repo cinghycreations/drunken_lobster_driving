@@ -1,5 +1,13 @@
 {
 	"camera": {
+		"shake": {
+			"durationBase": 0.5,
+			"durationCoeff": 0.10000000149011612,
+			"periodBase": 0.10000000149011612,
+			"periodCoeff": 0.10000000149011612,
+			"strengthBase": 0.20000000298023224,
+			"strengthCoeff": 0.20000000298023224
+		},
 		"zoom": 0.6000000238418579
 	},
 	"car": {
@@ -19,53 +27,28 @@
 			"Worst Lobster Ever"
 		],
 		"garden": {
-			"baseBlast": 0.0,
+			"baseBlast": 0.10000000149011612,
 			"blastMultiplierBonus": 0.0,
-			"shake": {
-				"shakePeriod": 0.10000000149011612,
-				"shakeStrength": 0.20000000298023224,
-				"shakeTime": 0.5
-			},
 			"speedMultiplierBonus": 1.0
 		},
 		"gaspump": {
-			"baseBlast": 0.0,
+			"baseBlast": 0.10000000149011612,
 			"blastMultiplierBonus": 0.0,
-			"shake": {
-				"shakePeriod": 0.10000000149011612,
-				"shakeStrength": 0.20000000298023224,
-				"shakeTime": 0.5
-			},
 			"speedMultiplierBonus": 2.0
 		},
 		"house": {
-			"baseBlast": 0.0,
-			"blastMultiplierBonus": 2.0,
-			"shake": {
-				"shakePeriod": 0.10000000149011612,
-				"shakeStrength": 0.20000000298023224,
-				"shakeTime": 0.5
-			},
+			"baseBlast": 0.10000000149011612,
+			"blastMultiplierBonus": 1.0,
 			"speedMultiplierBonus": 0.0
 		},
 		"nuclear": {
-			"baseBlast": 0.0,
+			"baseBlast": 0.5,
 			"blastMultiplierBonus": 0.0,
-			"shake": {
-				"shakePeriod": 0.10000000149011612,
-				"shakeStrength": 0.20000000298023224,
-				"shakeTime": 0.5
-			},
 			"speedMultiplierBonus": 0.0
 		},
 		"skyscraper": {
-			"baseBlast": 0.0,
+			"baseBlast": 0.25,
 			"blastMultiplierBonus": 5.0,
-			"shake": {
-				"shakePeriod": 0.10000000149011612,
-				"shakeStrength": 0.20000000298023224,
-				"shakeTime": 0.5
-			},
 			"speedMultiplierBonus": 0.0
 		}
 	},
