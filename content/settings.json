@@ -1,52 +1,85 @@
 {
 	"camera": {
-		"shakePeriod": 0.10000000149011612,
-		"shakeStrength": 0.10000000149011612,
-		"shakeTime": 0.5,
 		"zoom": 0.6000000238418579
 	},
 	"car": {
 		"baseSpeed": 1.0,
 		"grip": 0.4000000059604645,
 		"mouseSensibility": 0.009999999776482582,
+		"scoreMultiplierDecrease": 0.5,
 		"size": 0.30000001192092896,
-		"superSpeed": 2.0
+		"speedMultiplierDecrease": 0.5
 	},
 	"gameplay": {
+		"blastCategories": [
+			"Lame Lobster",
+			"Annoying Lobster",
+			"Infamous Lobster",
+			"Terrorist Lobster",
+			"Worst Lobster Ever"
+		],
 		"garden": {
-			"minDestructivenessToDestroy": 0.0,
-			"minSpeedToDestroy": 0.0,
-			"perkDestructiveness": 0.25,
-			"perkDuration": 10000000.0,
-			"superSpeedDuration": 0.0
+			"baseBlast": 0.0,
+			"blastMultiplierBonus": 0.0,
+			"shake": {
+				"shakePeriod": 0.10000000149011612,
+				"shakeStrength": 0.20000000298023224,
+				"shakeTime": 0.5
+			},
+			"speedMultiplierBonus": 1.0
 		},
 		"gaspump": {
-			"minDestructivenessToDestroy": 1.0,
-			"minSpeedToDestroy": 0.0,
-			"perkDestructiveness": 0.0,
-			"perkDuration": 0.0,
-			"superSpeedDuration": 2.0
+			"baseBlast": 0.0,
+			"blastMultiplierBonus": 0.0,
+			"shake": {
+				"shakePeriod": 0.10000000149011612,
+				"shakeStrength": 0.20000000298023224,
+				"shakeTime": 0.5
+			},
+			"speedMultiplierBonus": 2.0
 		},
 		"house": {
-			"minDestructivenessToDestroy": 1.0,
-			"minSpeedToDestroy": 0.0,
-			"perkDestructiveness": 0.0,
-			"perkDuration": 10000000.0,
-			"superSpeedDuration": 0.0
+			"baseBlast": 0.0,
+			"blastMultiplierBonus": 2.0,
+			"shake": {
+				"shakePeriod": 0.10000000149011612,
+				"shakeStrength": 0.20000000298023224,
+				"shakeTime": 0.5
+			},
+			"speedMultiplierBonus": 0.0
 		},
 		"nuclear": {
-			"minDestructivenessToDestroy": 0.0,
-			"minSpeedToDestroy": 0.0,
-			"perkDestructiveness": 0.0,
-			"perkDuration": 0.0,
-			"superSpeedDuration": 0.0
+			"baseBlast": 0.0,
+			"blastMultiplierBonus": 0.0,
+			"shake": {
+				"shakePeriod": 0.10000000149011612,
+				"shakeStrength": 0.20000000298023224,
+				"shakeTime": 0.5
+			},
+			"speedMultiplierBonus": 0.0
 		},
 		"skyscraper": {
-			"minDestructivenessToDestroy": 0.0,
-			"minSpeedToDestroy": 0.0,
-			"perkDestructiveness": 0.0,
-			"perkDuration": 0.0,
-			"superSpeedDuration": 0.0
+			"baseBlast": 0.0,
+			"blastMultiplierBonus": 5.0,
+			"shake": {
+				"shakePeriod": 0.10000000149011612,
+				"shakeStrength": 0.20000000298023224,
+				"shakeTime": 0.5
+			},
+			"speedMultiplierBonus": 0.0
 		}
-	}
+	},
+	"levels": [
+		{
+			"blastCategoryThresholds": [
+				0.0,
+				1.0,
+				2.0,
+				3.0,
+				4.0
+			],
+			"name": "Testbed",
+			"path": "levels/testbed.tmj"
+		}
+	]
 }
