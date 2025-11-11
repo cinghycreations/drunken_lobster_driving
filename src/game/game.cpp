@@ -1145,6 +1145,8 @@ private:
 	Rml::DataModelHandle sessionModel;
 	std::string buildVersion = "v0";
 	std::string buildDate = __DATE__ " " __TIME__;
+	std::vector<Rml::String> levelNames;
+	std::vector<Rml::String> levelRanks;
 	std::string speedMultiplier;
 	std::string blastMultiplier;
 	std::string blastCategory;
@@ -1159,7 +1161,7 @@ private:
 	std::chrono::microseconds backgroundTime;
 
 	void goToPage(const std::string& page);
-	void createSession();
+	void createSession(const int level_index);
 	void destroySession();
 
 	void selectLanguage(Rml::DataModelHandle handle, Rml::Event& event, const Rml::VariantList& params);
@@ -1168,6 +1170,8 @@ private:
 	void goToCredits(Rml::DataModelHandle handle, Rml::Event& event, const Rml::VariantList& params);
 	void goToHome(Rml::DataModelHandle handle, Rml::Event& event, const Rml::VariantList& params);
 	void quit(Rml::DataModelHandle handle, Rml::Event& event, const Rml::VariantList& params);
+
+	void playLevel(Rml::DataModelHandle handle, Rml::Event& event, const Rml::VariantList& params);
 	void pauseSession(Rml::DataModelHandle handle, Rml::Event& event, const Rml::VariantList& params);
 	void resumeSession(Rml::DataModelHandle handle, Rml::Event& event, const Rml::VariantList& params);
 	void restartSession(Rml::DataModelHandle handle, Rml::Event& event, const Rml::VariantList& params);
@@ -1178,16 +1182,28 @@ private:
 
 Launcher::Launcher(const Settings& _settings, const Storage& _storage, Content& _content, SDL_Window* _window, SDL_Renderer* _renderer, Rml::Context* ui_context)
 	: settings(_settings), storage(_storage), content(_content), window(_window), renderer(_renderer), uiContext(ui_context) {
+
+	levelNames.resize(10);
+	levelRanks.resize(10);
+	for (int i = 0; i < levelNames.size(); ++i) {
+		levelNames.at(i) = i < settings.levels.size() ? settings.levels.at(i).name : "<none>";
+		levelRanks.at(i) = i < settings.levels.size() ? settings.gameplay.blastCategories.front() : "<none>";
+	}
+
 	{
 		Rml::DataModelConstructor launcher_model_ctor = uiContext->CreateDataModel("launcher");
+		launcher_model_ctor.RegisterArray<std::vector<Rml::String>>();
 		launcher_model_ctor.BindEventCallback("selectLanguage", &Launcher::selectLanguage, this);
 		launcher_model_ctor.BindEventCallback("goToHowToPlay", &Launcher::goToHowToPlay, this);
 		launcher_model_ctor.BindEventCallback("goToDrive", &Launcher::goToDrive, this);
 		launcher_model_ctor.BindEventCallback("goToCredits", &Launcher::goToCredits, this);
 		launcher_model_ctor.BindEventCallback("goToHome", &Launcher::goToHome, this);
 		launcher_model_ctor.BindEventCallback("quit", &Launcher::quit, this);
+		launcher_model_ctor.BindEventCallback("playLevel", &Launcher::playLevel, this);
 		launcher_model_ctor.Bind("buildVersion", &buildVersion);
 		launcher_model_ctor.Bind("buildDate", &buildDate);
+		launcher_model_ctor.Bind("levelNames", &levelNames);
+		launcher_model_ctor.Bind("levelRanks", &levelRanks);
 		launcherModel = launcher_model_ctor.GetModelHandle();
 	}
 
@@ -1269,9 +1285,9 @@ void Launcher::goToPage(const std::string& page) {
 	document->Show();
 }
 
-void Launcher::createSession() {
+void Launcher::createSession(const int level_index) {
 	session.reset();
-	session.reset(new Session(settings, storage, content, window, renderer, 0));
+	session.reset(new Session(settings, storage, content, window, renderer, level_index));
 }
 
 void Launcher::destroySession() {
@@ -1291,8 +1307,7 @@ void Launcher::goToHowToPlay(Rml::DataModelHandle handle, Rml::Event& event, con
 }
 
 void Launcher::goToDrive(Rml::DataModelHandle handle, Rml::Event& event, const Rml::VariantList& params) {
-	deferredUpdates.emplace_back(std::bind(&Launcher::goToPage, this, "ui/ingame.html"));
-	deferredUpdates.emplace_back(std::bind(&Launcher::createSession, this));
+	deferredUpdates.emplace_back(std::bind(&Launcher::goToPage, this, "ui/drive.html"));
 }
 
 void Launcher::goToCredits(Rml::DataModelHandle handle, Rml::Event& event, const Rml::VariantList& params) {
@@ -1305,6 +1320,17 @@ void Launcher::goToHome(Rml::DataModelHandle handle, Rml::Event& event, const Rm
 
 void Launcher::quit(Rml::DataModelHandle handle, Rml::Event& event, const Rml::VariantList& params) {
 	shutdownRequested = true;
+}
+
+void Launcher::playLevel(Rml::DataModelHandle handle, Rml::Event& event, const Rml::VariantList& params) {
+	SDL_assert(params.size() == 1);
+
+	int level_index = 0;
+	const bool param0_ok = params.at(0).GetInto(level_index);
+	SDL_assert(param0_ok);
+
+	deferredUpdates.emplace_back(std::bind(&Launcher::goToPage, this, "ui/ingame.html"));
+	deferredUpdates.emplace_back(std::bind(&Launcher::createSession, this, level_index));
 }
 
 void Launcher::pauseSession(Rml::DataModelHandle handle, Rml::Event& event, const Rml::VariantList& params) {
