@@ -12,9 +12,9 @@
 	},
 	"car": {
 		"baseSpeed": 1.0,
+		"blastMultiplierDecrease": 0.5,
 		"grip": 0.4000000059604645,
 		"mouseSensibility": 0.009999999776482582,
-		"scoreMultiplierDecrease": 0.5,
 		"size": 0.30000001192092896,
 		"speedMultiplierDecrease": 0.5
 	},
@@ -56,13 +56,13 @@
 		{
 			"blastCategoryThresholds": [
 				0.0,
+				0.10000000149011612,
+				0.20000000298023224,
 				1.0,
-				2.0,
-				3.0,
-				4.0
+				1.5
 			],
-			"name": "Testbed",
-			"path": "levels/testbed.tmj"
+			"name": "Countryside",
+			"path": "levels/level0.tmj"
 		}
 	]
 }

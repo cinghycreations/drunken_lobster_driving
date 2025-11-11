@@ -1,52 +1,69 @@
 { "compressionlevel":-1,
- "height":10,
+ "height":13,
  "infinite":false,
  "layers":[
         {
-         "data":[6, 46, 46, 9, 47, 47, 6, 46, 46, 9,
-            45, 1, 1, 45, 1, 1, 14, 47, 47, 45,
-            19, 1, 1, 45, 47, 47, 45, 47, 47, 45,
-            45, 1, 1, 45, 1, 1, 45, 47, 47, 45,
-            14, 1, 1, 41, 46, 46, 42, 46, 44, 8,
-            45, 47, 47, 45, 1, 1, 47, 1, 45, 47,
-            45, 47, 47, 19, 1, 1, 47, 47, 45, 47,
-            45, 1, 1, 45, 1, 1, 47, 47, 45, 47,
-            7, 15, 46, 42, 46, 46, 15, 46, 8, 1,
-            1, 47, 47, 1, 1, 1, 1, 1, 1, 1],
-         "height":10,
-         "id":3,
+         "data":[64, 63, 63, 63, 63, 63, 63, 63, 63, 63, 63, 63,
+            64, 21, 21, 47, 21, 21, 47, 21, 21, 47, 21, 63,
+            64, 21, 22, 54, 62, 56, 54, 62, 56, 24, 21, 63,
+            64, 21, 61, 21, 21, 45, 21, 21, 45, 21, 21, 63,
+            64, 63, 61, 63, 63, 63, 63, 63, 63, 63, 63, 63,
+            64, 63, 61, 63, 63, 63, 63, 63, 22, 25, 63, 63,
+            64, 63, 23, 62, 62, 62, 62, 62, 32, 24, 63, 63,
+            64, 64, 63, 63, 63, 63, 63, 63, 61, 63, 63, 63,
+            64, 64, 64, 64, 64, 64, 64, 64, 61, 63, 63, 63,
+            63, 63, 63, 63, 63, 63, 63, 63, 61, 63, 63, 63,
+            63, 63, 44, 62, 62, 62, 62, 62, 24, 63, 63, 63,
+            63, 63, 63, 63, 63, 63, 63, 63, 63, 63, 63, 63,
+            63, 63, 63, 63, 63, 63, 63, 63, 63, 63, 63, 63],
+         "height":13,
+         "id":1,
          "name":"ground",
          "opacity":1,
          "type":"tilelayer",
          "visible":true,
-         "width":10,
+         "width":12,
          "x":0,
          "y":0
         }, 
         {
-         "data":[0, 0, 0, 0, 52, 52, 0, 0, 0, 0,
-            0, 51, 51, 0, 49, 49, 0, 52, 52, 0,
-            0, 49, 49, 0, 52, 52, 0, 52, 52, 0,
-            0, 49, 48, 0, 49, 49, 0, 52, 52, 0,
-            0, 49, 49, 0, 0, 0, 0, 0, 0, 0,
-            0, 52, 52, 0, 49, 49, 52, 48, 0, 52,
-            0, 52, 52, 0, 49, 49, 52, 52, 0, 52,
-            0, 48, 49, 0, 49, 49, 52, 52, 0, 52,
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 49,
-            51, 52, 52, 49, 49, 49, 49, 49, 48, 49],
-         "height":10,
-         "id":1,
+         "data":[0, 14, 9, 9, 9, 9, 9, 9, 9, 9, 9, 0,
+            6, 0, 2, 0, 0, 2, 0, 0, 4, 0, 0, 8,
+            6, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 8,
+            6, 0, 0, 0, 2, 0, 0, 2, 0, 0, 0, 8,
+            6, 0, 0, 0, 16, 11, 11, 11, 11, 11, 7, 0,
+            6, 0, 0, 0, 0, 0, 0, 0, 0, 0, 8, 0,
+            6, 0, 0, 0, 0, 1, 1, 0, 0, 0, 8, 0,
+            0, 12, 0, 0, 0, 0, 0, 0, 0, 0, 8, 0,
+            0, 9, 11, 11, 11, 11, 11, 18, 1, 16, 0, 0,
+            12, 0, 0, 0, 0, 0, 0, 0, 0, 0, 8, 0,
+            6, 0, 0, 0, 0, 0, 0, 0, 0, 0, 8, 0,
+            6, 0, 0, 0, 0, 0, 0, 0, 0, 0, 8, 0,
+            0, 7, 7, 7, 7, 7, 7, 7, 7, 7, 0, 0],
+         "height":13,
+         "id":2,
          "name":"buildings",
          "opacity":1,
          "type":"tilelayer",
          "visible":true,
-         "width":10,
+         "width":12,
          "x":0,
          "y":0
         }],
- "nextlayerid":4,
+ "nextlayerid":3,
  "nextobjectid":1,
  "orientation":"isometric",
+ "properties":[
+        {
+         "name":"startX",
+         "type":"int",
+         "value":2
+        }, 
+        {
+         "name":"startY",
+         "type":"int",
+         "value":10
+        }],
  "renderorder":"right-down",
  "tiledversion":"1.11.2",
  "tileheight":256,
@@ -61,9 +78,167 @@
              "width":1
             },
          "margin":0,
+         "name":"buildings",
+         "spacing":0,
+         "tilecount":20,
+         "tileheight":768,
+         "tiles":[
+                {
+                 "id":0,
+                 "image":"..\/buildings\/buildings0001.png",
+                 "imageheight":768,
+                 "imagewidth":512,
+                 "type":"garden"
+                }, 
+                {
+                 "id":1,
+                 "image":"..\/buildings\/buildings0002.png",
+                 "imageheight":768,
+                 "imagewidth":512,
+                 "type":"house"
+                }, 
+                {
+                 "id":2,
+                 "image":"..\/buildings\/buildings0003.png",
+                 "imageheight":768,
+                 "imagewidth":512,
+                 "type":"gaspump"
+                }, 
+                {
+                 "id":3,
+                 "image":"..\/buildings\/buildings0004.png",
+                 "imageheight":768,
+                 "imagewidth":512,
+                 "type":"skyscraper"
+                }, 
+                {
+                 "id":4,
+                 "image":"..\/buildings\/buildings0005.png",
+                 "imageheight":768,
+                 "imagewidth":512,
+                 "type":"nuclear"
+                }, 
+                {
+                 "id":5,
+                 "image":"..\/buildings\/buildings0006.png",
+                 "imageheight":768,
+                 "imagewidth":512,
+                 "type":"impassable"
+                }, 
+                {
+                 "id":6,
+                 "image":"..\/buildings\/buildings0007.png",
+                 "imageheight":768,
+                 "imagewidth":512,
+                 "type":"impassable"
+                }, 
+                {
+                 "id":7,
+                 "image":"..\/buildings\/buildings0008.png",
+                 "imageheight":768,
+                 "imagewidth":512,
+                 "type":"impassable"
+                }, 
+                {
+                 "id":8,
+                 "image":"..\/buildings\/buildings0009.png",
+                 "imageheight":768,
+                 "imagewidth":512,
+                 "type":"impassable"
+                }, 
+                {
+                 "id":9,
+                 "image":"..\/buildings\/buildings0010.png",
+                 "imageheight":768,
+                 "imagewidth":512,
+                 "type":"impassable"
+                }, 
+                {
+                 "id":10,
+                 "image":"..\/buildings\/buildings0011.png",
+                 "imageheight":768,
+                 "imagewidth":512,
+                 "type":"impassable"
+                }, 
+                {
+                 "id":11,
+                 "image":"..\/buildings\/buildings0012.png",
+                 "imageheight":768,
+                 "imagewidth":512,
+                 "type":"impassable"
+                },
+            
+                {
+                 "id":12,
+                 "image":"..\/buildings\/buildings0013.png",
+                 "imageheight":768,
+                 "imagewidth":512,
+                 "type":"impassable"
+                }, 
+                {
+                 "id":13,
+                 "image":"..\/buildings\/buildings0014.png",
+                 "imageheight":768,
+                 "imagewidth":512,
+                 "type":"impassable"
+                }, 
+                {
+                 "id":14,
+                 "image":"..\/buildings\/buildings0015.png",
+                 "imageheight":768,
+                 "imagewidth":512,
+                 "type":"impassable"
+                }, 
+                {
+                 "id":15,
+                 "image":"..\/buildings\/buildings0016.png",
+                 "imageheight":768,
+                 "imagewidth":512,
+                 "type":"impassable"
+                }, 
+                {
+                 "id":16,
+                 "image":"..\/buildings\/buildings0017.png",
+                 "imageheight":768,
+                 "imagewidth":512,
+                 "type":"impassable"
+                }, 
+                {
+                 "id":17,
+                 "image":"..\/buildings\/buildings0018.png",
+                 "imageheight":768,
+                 "imagewidth":512,
+                 "type":"impassable"
+                }, 
+                {
+                 "id":18,
+                 "image":"..\/buildings\/buildings0019.png",
+                 "imageheight":768,
+                 "imagewidth":512,
+                 "type":"impassable"
+                }, 
+                {
+                 "id":19,
+                 "image":"..\/buildings\/buildings0020.png",
+                 "imageheight":768,
+                 "imagewidth":512,
+                 "type":"impassable"
+                }],
+         "tilewidth":512
+        }, 
+        {
+         "columns":0,
+         "firstgid":21,
+         "grid":
+            {
+             "height":1,
+             "orientation":"orthogonal",
+             "width":1
+            },
+         "margin":0,
          "name":"ground",
          "spacing":0,
-         "tilecount":47,
+         "tilecount":44,
          "tileheight":512,
          "tiles":[
                 {
@@ -125,8 +300,7 @@
                  "image":"..\/roads\/road0010.png",
                  "imageheight":512,
                  "imagewidth":512
-                },
-            
+                }, 
                 {
                  "id":10,
                  "image":"..\/roads\/road0011.png",
@@ -138,7 +312,8 @@
                  "image":"..\/roads\/road0012.png",
                  "imageheight":512,
                  "imagewidth":512
-                }, 
+                },
+            
                 {
                  "id":12,
                  "image":"..\/roads\/road0013.png",
@@ -186,8 +361,7 @@
                  "image":"..\/roads\/road0020.png",
                  "imageheight":512,
                  "imagewidth":512
-                },
-            
+                }, 
                 {
                  "id":20,
                  "image":"..\/roads\/road0021.png",
@@ -211,7 +385,8 @@
                  "image":"..\/roads\/road0024.png",
                  "imageheight":512,
                  "imagewidth":512
-                }, 
+                },
+            
                 {
                  "id":24,
                  "image":"..\/roads\/road0025.png",
@@ -247,8 +422,7 @@
                  "image":"..\/roads\/road0030.png",
                  "imageheight":512,
                  "imagewidth":512
-                },
-            
+                }, 
                 {
                  "id":30,
                  "image":"..\/roads\/road0031.png",
@@ -284,7 +458,8 @@
                  "image":"..\/roads\/road0036.png",
                  "imageheight":512,
                  "imagewidth":512
-                }, 
+                },
+            
                 {
                  "id":36,
                  "image":"..\/roads\/road0037.png",
@@ -308,8 +483,7 @@
                  "image":"..\/roads\/road0040.png",
                  "imageheight":512,
                  "imagewidth":512
-                },
-            
+                }, 
                 {
                  "id":40,
                  "image":"..\/roads\/road0041.png",
@@ -333,76 +507,11 @@
                  "image":"..\/roads\/road0044.png",
                  "imageheight":512,
                  "imagewidth":512
-                }, 
-                {
-                 "id":44,
-                 "image":"..\/roads\/road0045.png",
-                 "imageheight":512,
-                 "imagewidth":512
-                }, 
-                {
-                 "id":45,
-                 "image":"..\/roads\/road0046.png",
-                 "imageheight":512,
-                 "imagewidth":512
-                }, 
-                {
-                 "id":46,
-                 "image":"..\/roads\/road0047.png",
-                 "imageheight":512,
-                 "imagewidth":512
-                }],
-         "tilewidth":512
-        }, 
-        {
-         "columns":0,
-         "firstgid":48,
-         "grid":
-            {
-             "height":1,
-             "orientation":"orthogonal",
-             "width":1
-            },
-         "margin":0,
-         "name":"buildings",
-         "spacing":0,
-         "tilecount":5,
-         "tileheight":768,
-         "tiles":[
-                {
-                 "id":0,
-                 "image":"..\/buildings\/gaspump0000.png",
-                 "imageheight":512,
-                 "imagewidth":512
-                }, 
-                {
-                 "id":1,
-                 "image":"..\/buildings\/house0000.png",
-                 "imageheight":512,
-                 "imagewidth":512
-                }, 
-                {
-                 "id":2,
-                 "image":"..\/buildings\/nuclear0000.png",
-                 "imageheight":768,
-                 "imagewidth":512
-                }, 
-                {
-                 "id":3,
-                 "image":"..\/buildings\/skyscraper0000.png",
-                 "imageheight":768,
-                 "imagewidth":512
-                }, 
-                {
-                 "id":4,
-                 "image":"..\/buildings\/garden0000.png",
-                 "imageheight":512,
-                 "imagewidth":512
                 }],
          "tilewidth":512
         }],
  "tilewidth":512,
  "type":"map",
  "version":"1.10",
- "width":10
+ "width":12
 }

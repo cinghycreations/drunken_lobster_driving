@@ -430,6 +430,10 @@ public:
 
 	void restart();
 
+	bool isFinished() const {
+		return finishTime.has_value();
+	}
+
 	std::chrono::microseconds getSessionTime() {
 		return sessionTotalTime;
 	}
@@ -618,11 +622,6 @@ Session::Session(const Settings& _settings, const Storage& _storage, const Conte
 		worldStartingPosition = float2(level->getProp("startX")->getValue<int>(), level->getProp("startY")->getValue<int>()) + float2(0.5f);
 	}
 	carPosition = worldStartingPosition;
-
-	{
-		const bool mouse_mode_ok = SDL_SetWindowRelativeMouseMode(window, true);
-		SDL_assert(mouse_mode_ok);
-	}
 }
 
 Session::~Session() {
@@ -910,14 +909,12 @@ void Session::updateCarCollisions(const std::chrono::microseconds total_time) {
 }
 
 bool Session::isGameFinished() const {
-	return std::all_of(cells.begin(), cells.end(), [](const CellState& cell) { return cell.buildingType == BuildingType::None || cell.destructed; });
+	return std::all_of(cells.begin(), cells.end(),
+					   [](const CellState& cell) { return cell.buildingType == BuildingType::None || cell.buildingType == BuildingType::Impassable || cell.destructed; });
 }
 
 void Session::pause(const bool _paused) {
 	paused = _paused;
-
-	const bool mouse_mode_ok = SDL_SetWindowRelativeMouseMode(window, !paused);
-	SDL_assert(mouse_mode_ok);
 }
 
 void Session::restart() {
@@ -935,9 +932,6 @@ void Session::restart() {
 	sessionTotalTime = std::chrono::microseconds(0);
 	finishTime.reset();
 	paused = false;
-
-	const bool mouse_mode_ok = SDL_SetWindowRelativeMouseMode(window, !paused);
-	SDL_assert(mouse_mode_ok);
 }
 
 void Session::renderEntity(const float2& world_coords, const float world_size, SDL_Texture* texture) {
@@ -1150,6 +1144,7 @@ private:
 	std::string speedMultiplier;
 	std::string blastMultiplier;
 	std::string blastCategory;
+	bool resultsShown = false;
 	int countdown = 0;
 
 	Rml::ElementDocument* document = nullptr;
@@ -1178,6 +1173,7 @@ private:
 	void exitSession(Rml::DataModelHandle handle, Rml::Event& event, const Rml::VariantList& params);
 
 	void renderBackground();
+	void captureMouse(const bool capture);
 };
 
 Launcher::Launcher(const Settings& _settings, const Storage& _storage, Content& _content, SDL_Window* _window, SDL_Renderer* _renderer, Rml::Context* ui_context)
@@ -1242,8 +1238,9 @@ void Launcher::update(const std::chrono::microseconds real_total_time, const std
 		int numkeys;
 		const bool* keystates = SDL_GetKeyboardState(&numkeys);
 		if (session && !session->isPaused() && SDL_SCANCODE_ESCAPE < numkeys && keystates[SDL_SCANCODE_ESCAPE]) {
-			goToPage("ui/pause.html");
 			session->pause(true);
+			captureMouse(false);
+			goToPage("ui/pause.html");
 		}
 	}
 
@@ -1261,6 +1258,12 @@ void Launcher::update(const std::chrono::microseconds real_total_time, const std
 
 		countdown = (session->getCountdownTime().count() + 999999) / 1000000;
 		sessionModel.DirtyVariable("countdown");
+
+		if (session->isFinished() && !resultsShown) {
+			resultsShown = true;
+			captureMouse(false);
+			goToPage("ui/results.html");
+		}
 	}
 
 	backgroundTime = real_total_time;
@@ -1288,10 +1291,12 @@ void Launcher::goToPage(const std::string& page) {
 void Launcher::createSession(const int level_index) {
 	session.reset();
 	session.reset(new Session(settings, storage, content, window, renderer, level_index));
+	resultsShown = false;
 }
 
 void Launcher::destroySession() {
 	session.reset();
+	resultsShown = false;
 }
 
 void Launcher::selectLanguage(Rml::DataModelHandle handle, Rml::Event& event, const Rml::VariantList& params) {
@@ -1329,28 +1334,44 @@ void Launcher::playLevel(Rml::DataModelHandle handle, Rml::Event& event, const R
 	const bool param0_ok = params.at(0).GetInto(level_index);
 	SDL_assert(param0_ok);
 
-	deferredUpdates.emplace_back(std::bind(&Launcher::goToPage, this, "ui/ingame.html"));
-	deferredUpdates.emplace_back(std::bind(&Launcher::createSession, this, level_index));
+	deferredUpdates.emplace_back([this, level_index]() {
+		createSession(level_index);
+		captureMouse(true);
+		goToPage("ui/ingame.html");
+	});
 }
 
 void Launcher::pauseSession(Rml::DataModelHandle handle, Rml::Event& event, const Rml::VariantList& params) {
-	deferredUpdates.emplace_back([this]() { session->pause(true); });
-	deferredUpdates.emplace_back(std::bind(&Launcher::goToPage, this, "ui/pause.html"));
+	deferredUpdates.emplace_back([this]() {
+		session->pause(true);
+		captureMouse(false);
+		goToPage("ui/pause.html");
+	});
 }
 
 void Launcher::resumeSession(Rml::DataModelHandle handle, Rml::Event& event, const Rml::VariantList& params) {
-	deferredUpdates.emplace_back(std::bind(&Launcher::goToPage, this, "ui/ingame.html"));
-	deferredUpdates.emplace_back([this]() { session->pause(false); });
+	deferredUpdates.emplace_back([this]() {
+		session->pause(false);
+		captureMouse(true);
+		goToPage("ui/ingame.html");
+	});
 }
 
 void Launcher::restartSession(Rml::DataModelHandle handle, Rml::Event& event, const Rml::VariantList& params) {
-	deferredUpdates.emplace_back(std::bind(&Launcher::goToPage, this, "ui/ingame.html"));
-	deferredUpdates.emplace_back([this]() { session->restart(); });
+	deferredUpdates.emplace_back([this]() {
+		resultsShown = false;
+		session->restart();
+		captureMouse(true);
+		goToPage("ui/ingame.html");
+	});
 }
 
 void Launcher::exitSession(Rml::DataModelHandle handle, Rml::Event& event, const Rml::VariantList& params) {
-	deferredUpdates.emplace_back(std::bind(&Launcher::destroySession, this));
-	deferredUpdates.emplace_back(std::bind(&Launcher::goToPage, this, "ui/home.html"));
+	deferredUpdates.emplace_back([this]() {
+		destroySession();
+		captureMouse(false);
+		goToPage("ui/drive.html");
+	});
 }
 
 void Launcher::renderBackground() {
@@ -1383,6 +1404,11 @@ void Launcher::renderBackground() {
 
 	const bool render_texture_ok = SDL_RenderTextureTiled(renderer, texture, nullptr, texture_scale, &dest_rect);
 	SDL_assert(render_texture_ok);
+}
+
+void Launcher::captureMouse(const bool capture) {
+	const bool mouse_mode_ok = SDL_SetWindowRelativeMouseMode(window, capture);
+	SDL_assert(mouse_mode_ok);
 }
 
 /////////
