@@ -1162,9 +1162,7 @@ private:
 	void createSession();
 	void destroySession();
 
-	void selectLanguageItalian(Rml::DataModelHandle handle, Rml::Event& event, const Rml::VariantList& params);
-	void selectLanguageEnglish(Rml::DataModelHandle handle, Rml::Event& event, const Rml::VariantList& params);
-	void selectLanguageSpanish(Rml::DataModelHandle handle, Rml::Event& event, const Rml::VariantList& params);
+	void selectLanguage(Rml::DataModelHandle handle, Rml::Event& event, const Rml::VariantList& params);
 	void goToHowToPlay(Rml::DataModelHandle handle, Rml::Event& event, const Rml::VariantList& params);
 	void goToDrive(Rml::DataModelHandle handle, Rml::Event& event, const Rml::VariantList& params);
 	void goToCredits(Rml::DataModelHandle handle, Rml::Event& event, const Rml::VariantList& params);
@@ -1182,9 +1180,7 @@ Launcher::Launcher(const Settings& _settings, const Storage& _storage, Content& 
 	: settings(_settings), storage(_storage), content(_content), window(_window), renderer(_renderer), uiContext(ui_context) {
 	{
 		Rml::DataModelConstructor launcher_model_ctor = uiContext->CreateDataModel("launcher");
-		launcher_model_ctor.BindEventCallback("selectLanguageItalian", &Launcher::selectLanguageItalian, this);
-		launcher_model_ctor.BindEventCallback("selectLanguageEnglish", &Launcher::selectLanguageEnglish, this);
-		launcher_model_ctor.BindEventCallback("selectLanguageSpanish", &Launcher::selectLanguageSpanish, this);
+		launcher_model_ctor.BindEventCallback("selectLanguage", &Launcher::selectLanguage, this);
 		launcher_model_ctor.BindEventCallback("goToHowToPlay", &Launcher::goToHowToPlay, this);
 		launcher_model_ctor.BindEventCallback("goToDrive", &Launcher::goToDrive, this);
 		launcher_model_ctor.BindEventCallback("goToCredits", &Launcher::goToCredits, this);
@@ -1282,9 +1278,13 @@ void Launcher::destroySession() {
 	session.reset();
 }
 
-void Launcher::selectLanguageItalian(Rml::DataModelHandle handle, Rml::Event& event, const Rml::VariantList& params) {}
-void Launcher::selectLanguageEnglish(Rml::DataModelHandle handle, Rml::Event& event, const Rml::VariantList& params) {}
-void Launcher::selectLanguageSpanish(Rml::DataModelHandle handle, Rml::Event& event, const Rml::VariantList& params) {}
+void Launcher::selectLanguage(Rml::DataModelHandle handle, Rml::Event& event, const Rml::VariantList& params) {
+	SDL_assert(params.size() == 1);
+	SDL_assert(params.at(0).GetType() == Rml::Variant::STRING);
+
+	const std::string& language = params.at(0).GetReference<std::string>();
+	SDL_assert(language == "it" || language == "en" || language == "es");
+}
 
 void Launcher::goToHowToPlay(Rml::DataModelHandle handle, Rml::Event& event, const Rml::VariantList& params) {
 	deferredUpdates.emplace_back(std::bind(&Launcher::goToPage, this, "ui/howto.html"));
