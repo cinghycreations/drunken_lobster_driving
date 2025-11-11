@@ -161,9 +161,9 @@ struct CarSettings {
 	float grip = 1;
 	float baseSpeed = 0.1f;
 	float speedMultiplierDecrease = 0.5f;
-	float scoreMultiplierDecrease = 0.5f;
+	float blastMultiplierDecrease = 0.5f;
 
-	NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(CarSettings, size, mouseSensibility, grip, baseSpeed, speedMultiplierDecrease, scoreMultiplierDecrease);
+	NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(CarSettings, size, mouseSensibility, grip, baseSpeed, speedMultiplierDecrease, blastMultiplierDecrease);
 };
 
 struct BuildingSettings {
@@ -246,7 +246,7 @@ void Settings::update(const Storage& storage) {
 			ImGui::SliderFloat("Grip", &car.grip, 0, 1);
 			ImGui::DragFloat("Base Speed", &car.baseSpeed, 0.01f);
 			ImGui::DragFloat("Speed Multiplier Decrease", &car.speedMultiplierDecrease, 0.01f);
-			ImGui::DragFloat("Score Multiplier Decrease", &car.scoreMultiplierDecrease, 0.01f);
+			ImGui::DragFloat("Blast Multiplier Decrease", &car.blastMultiplierDecrease, 0.01f);
 		}
 
 		if (ImGui::CollapsingHeader("Gameplay", ImGuiTreeNodeFlags_DefaultOpen)) {
@@ -268,7 +268,7 @@ void Settings::update(const Storage& storage) {
 				ImGui::PushID(entry.first);
 				ImGui::Text("%s", entry.first);
 				ImGui::DragFloat("Speed Multiplier Bonus", &entry.second->speedMultiplierBonus, 0.01f);
-				ImGui::DragFloat("Score Multiplier Bonus", &entry.second->blastMultiplierBonus, 0.01f);
+				ImGui::DragFloat("Blast Multiplier Bonus", &entry.second->blastMultiplierBonus, 0.01f);
 				ImGui::DragFloat("Base Blast", &entry.second->baseBlast, 0.01f);
 				ImGui::Separator();
 				ImGui::PopID();
@@ -744,7 +744,7 @@ void Session::update(const std::chrono::microseconds real_delta_time) {
 	if (ImGui::Begin("Car Stats")) {
 		ImGui::BeginDisabled(paused);
 		ImGui::Text("Speed Multiplier: %f", carStats.speedMultiplier);
-		ImGui::Text("Score Multiplier: %f", carStats.blastMultiplier);
+		ImGui::Text("Blast Multiplier: %f", carStats.blastMultiplier);
 		ImGui::Text("Total Blast: %f", carStats.totalBlast);
 		ImGui::Text("Best Blast: %f", carStats.bestBlast);
 		ImGui::Text("Session Total Time: %.2fs", TimeUtils::microsecondsToFloatSeconds(sessionTotalTime));
@@ -760,7 +760,7 @@ void Session::update(const std::chrono::microseconds real_delta_time) {
 }
 
 void Session::updateCarStats(const std::chrono::microseconds delta_time) {
-	carStats.blastMultiplier -= settings.car.scoreMultiplierDecrease * TimeUtils::microsecondsToFloatSeconds(delta_time);
+	carStats.blastMultiplier -= settings.car.blastMultiplierDecrease * TimeUtils::microsecondsToFloatSeconds(delta_time);
 	carStats.blastMultiplier = std::clamp<float>(carStats.blastMultiplier, 1, FLT_MAX);
 	carStats.speedMultiplier -= settings.car.speedMultiplierDecrease * TimeUtils::microsecondsToFloatSeconds(delta_time);
 	carStats.speedMultiplier = std::clamp<float>(carStats.speedMultiplier, 1, FLT_MAX);
