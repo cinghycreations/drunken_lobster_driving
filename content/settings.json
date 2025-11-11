@@ -4,19 +4,19 @@
 			"durationBase": 0.5,
 			"durationCoeff": 0.10000000149011612,
 			"periodBase": 0.10000000149011612,
-			"periodCoeff": 0.10000000149011612,
-			"strengthBase": 0.20000000298023224,
-			"strengthCoeff": 0.20000000298023224
+			"periodCoeff": 0.0,
+			"strengthBase": 0.009999999776482582,
+			"strengthCoeff": 0.019999999552965164
 		},
 		"zoom": 0.6000000238418579
 	},
 	"car": {
 		"baseSpeed": 1.0,
-		"blastMultiplierDecrease": 0.5,
+		"blastMultiplierDecrease": 0.800000011920929,
 		"grip": 0.4000000059604645,
-		"mouseSensibility": 0.009999999776482582,
+		"mouseSensibility": 0.007499999832361937,
 		"size": 0.30000001192092896,
-		"speedMultiplierDecrease": 0.5
+		"speedMultiplierDecrease": 0.800000011920929
 	},
 	"gameplay": {
 		"blastCategories": [
@@ -48,7 +48,7 @@
 		},
 		"skyscraper": {
 			"baseBlast": 0.25,
-			"blastMultiplierBonus": 5.0,
+			"blastMultiplierBonus": 3.0,
 			"speedMultiplierBonus": 0.0
 		}
 	},
@@ -63,6 +63,17 @@
 			],
 			"name": "Countryside",
 			"path": "levels/level0.tmj"
+		},
+		{
+			"blastCategoryThresholds": [
+				0.0,
+				1.0,
+				2.0,
+				3.0,
+				4.0
+			],
+			"name": "Smalltown",
+			"path": "levels/level1.tmj"
 		}
 	]
 }
