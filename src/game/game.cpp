@@ -34,6 +34,19 @@ using float3 = glm::vec3;
 using float4 = glm::vec4;
 using int2 = glm::ivec2;
 
+///////////////////////
+// GLM serialization //
+///////////////////////
+
+namespace glm {
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(vec2, x, y);
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(vec3, x, y, z);
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(vec4, x, y, z, w);
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(ivec2, x, y);
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(ivec3, x, y, z);
+NLOHMANN_DEFINE_TYPE_NON_INTRUSIVE(ivec4, x, y, z, w);
+}; // namespace glm
+
 ///////////
 // Utils //
 ///////////
@@ -160,10 +173,15 @@ struct CarSettings {
 	float mouseSensibility = 0.01f;
 	float grip = 1;
 	float baseSpeed = 0.1f;
+	float2 speedMultiplierRange = float2(1, 4);
+	float2 speedMultiplierStackedRange = float2(1, 5);
 	float speedMultiplierDecrease = 0.5f;
+	float2 blastMultiplierRange = float2(1, 5);
+	float2 blastMultiplierStackedRange = float2(1, 6);
 	float blastMultiplierDecrease = 0.5f;
 
-	NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(CarSettings, size, mouseSensibility, grip, baseSpeed, speedMultiplierDecrease, blastMultiplierDecrease);
+	NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(CarSettings, size, mouseSensibility, grip, baseSpeed, speedMultiplierRange, speedMultiplierStackedRange, speedMultiplierDecrease,
+												blastMultiplierRange, blastMultiplierStackedRange, blastMultiplierDecrease);
 };
 
 struct BuildingSettings {
@@ -245,7 +263,11 @@ void Settings::update(const Storage& storage) {
 			ImGui::DragFloat("Mouse Sensibility", &car.mouseSensibility, 0.01f);
 			ImGui::SliderFloat("Grip", &car.grip, 0, 1);
 			ImGui::DragFloat("Base Speed", &car.baseSpeed, 0.01f);
+			ImGui::DragFloat2("Speed Multiplier Range", &car.speedMultiplierRange.x, 0.01f);
+			ImGui::DragFloat2("Speed Multiplier Stacked Range", &car.speedMultiplierStackedRange.x, 0.01f);
 			ImGui::DragFloat("Speed Multiplier Decrease", &car.speedMultiplierDecrease, 0.01f);
+			ImGui::DragFloat2("Blast Multiplier Range", &car.blastMultiplierRange.x, 0.01f);
+			ImGui::DragFloat2("Blast Multiplier Stacked Range", &car.blastMultiplierStackedRange.x, 0.01f);
 			ImGui::DragFloat("Blast Multiplier Decrease", &car.blastMultiplierDecrease, 0.01f);
 		}
 
@@ -473,8 +495,10 @@ private:
 	};
 
 	struct CarStats {
-		float speedMultiplier = 1;
-		float blastMultiplier = 1;
+		float speedStackedMultiplier = 0;
+		float speedMultiplier = 0;
+		float blastStackedMultiplier = 0;
+		float blastMultiplier = 0;
 		float totalBlast = 0;
 		float bestBlast = 0;
 	};
@@ -742,7 +766,9 @@ void Session::update(const std::chrono::microseconds real_delta_time) {
 
 	if (ImGui::Begin("Car Stats")) {
 		ImGui::BeginDisabled(paused);
+		ImGui::Text("Speed Stacked Multiplier: %f", carStats.speedStackedMultiplier);
 		ImGui::Text("Speed Multiplier: %f", carStats.speedMultiplier);
+		ImGui::Text("Blast Stacked Multiplier: %f", carStats.blastStackedMultiplier);
 		ImGui::Text("Blast Multiplier: %f", carStats.blastMultiplier);
 		ImGui::Text("Total Blast: %f", carStats.totalBlast);
 		ImGui::Text("Best Blast: %f", carStats.bestBlast);
@@ -759,10 +785,12 @@ void Session::update(const std::chrono::microseconds real_delta_time) {
 }
 
 void Session::updateCarStats(const std::chrono::microseconds delta_time) {
-	carStats.blastMultiplier -= settings.car.blastMultiplierDecrease * TimeUtils::microsecondsToFloatSeconds(delta_time);
-	carStats.blastMultiplier = std::clamp<float>(carStats.blastMultiplier, 1, FLT_MAX);
-	carStats.speedMultiplier -= settings.car.speedMultiplierDecrease * TimeUtils::microsecondsToFloatSeconds(delta_time);
-	carStats.speedMultiplier = std::clamp<float>(carStats.speedMultiplier, 1, FLT_MAX);
+	carStats.blastStackedMultiplier -= settings.car.blastMultiplierDecrease * TimeUtils::microsecondsToFloatSeconds(delta_time);
+	carStats.blastStackedMultiplier = std::clamp<float>(carStats.blastStackedMultiplier, settings.car.blastMultiplierStackedRange.x, settings.car.blastMultiplierStackedRange.y);
+	carStats.blastMultiplier = std::clamp<float>(carStats.blastStackedMultiplier, settings.car.blastMultiplierRange.x, settings.car.blastMultiplierRange.y);
+	carStats.speedStackedMultiplier -= settings.car.speedMultiplierDecrease * TimeUtils::microsecondsToFloatSeconds(delta_time);
+	carStats.speedStackedMultiplier = std::clamp<float>(carStats.speedStackedMultiplier, settings.car.speedMultiplierStackedRange.x, settings.car.speedMultiplierStackedRange.y);
+	carStats.speedMultiplier = std::clamp<float>(carStats.speedStackedMultiplier, settings.car.speedMultiplierRange.x, settings.car.speedMultiplierRange.y);
 }
 
 void Session::updateCarDrive(const std::chrono::microseconds delta_time) {
@@ -874,8 +902,8 @@ void Session::updateCarCollisions(const std::chrono::microseconds total_time) {
 		cell.destructed = true;
 		cell.destructionTime = total_time;
 
-		carStats.speedMultiplier += building_settings->speedMultiplierBonus;
-		carStats.blastMultiplier += building_settings->blastMultiplierBonus;
+		carStats.speedStackedMultiplier += building_settings->speedMultiplierBonus;
+		carStats.blastStackedMultiplier += building_settings->blastMultiplierBonus;
 		const float blast = carStats.blastMultiplier * building_settings->baseBlast;
 		carStats.totalBlast += blast;
 		carStats.bestBlast = std::max(carStats.bestBlast, blast);
@@ -1247,10 +1275,10 @@ void Launcher::update(const std::chrono::microseconds real_total_time, const std
 	if (session) {
 		session->update(real_delta_time);
 
-		speedMultiplier = fmt::format("{:.02f}", session->getSpeedMultiplier());
+		speedMultiplier = fmt::format("{:.01f}", session->getSpeedMultiplier());
 		sessionModel.DirtyVariable("speedMultiplier");
 
-		blastMultiplier = fmt::format("{:.02f}", session->getBlastMultiplier());
+		blastMultiplier = fmt::format("{:.01f}", session->getBlastMultiplier());
 		sessionModel.DirtyVariable("blastMultiplier");
 
 		blastCategory = session->getBlastCategory();

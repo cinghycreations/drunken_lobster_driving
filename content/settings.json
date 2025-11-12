@@ -11,12 +11,28 @@
 		"zoom": 0.6000000238418579
 	},
 	"car": {
-		"baseSpeed": 1.0,
-		"blastMultiplierDecrease": 0.800000011920929,
+		"baseSpeed": 1.5,
+		"blastMultiplierDecrease": 0.75,
+		"blastMultiplierRange": {
+			"x": 1.0,
+			"y": 5.0
+		},
+		"blastMultiplierStackedRange": {
+			"x": 1.0,
+			"y": 6.0
+		},
 		"grip": 0.4000000059604645,
 		"mouseSensibility": 0.007499999832361937,
 		"size": 0.30000001192092896,
-		"speedMultiplierDecrease": 0.800000011920929
+		"speedMultiplierDecrease": 1.0,
+		"speedMultiplierRange": {
+			"x": 1.0,
+			"y": 2.0999999046325684
+		},
+		"speedMultiplierStackedRange": {
+			"x": 1.0,
+			"y": 2.0999999046325684
+		}
 	},
 	"gameplay": {
 		"blastCategories": [
@@ -29,27 +45,27 @@
 		"garden": {
 			"baseBlast": 0.10000000149011612,
 			"blastMultiplierBonus": 0.0,
-			"speedMultiplierBonus": 1.0
+			"speedMultiplierBonus": 3.0
 		},
 		"gaspump": {
 			"baseBlast": 0.10000000149011612,
 			"blastMultiplierBonus": 0.0,
-			"speedMultiplierBonus": 2.0
+			"speedMultiplierBonus": 3.0
 		},
 		"house": {
 			"baseBlast": 0.10000000149011612,
 			"blastMultiplierBonus": 1.0,
-			"speedMultiplierBonus": 0.0
+			"speedMultiplierBonus": 3.0
 		},
 		"nuclear": {
 			"baseBlast": 0.5,
 			"blastMultiplierBonus": 0.0,
-			"speedMultiplierBonus": 0.0
+			"speedMultiplierBonus": 3.0
 		},
 		"skyscraper": {
 			"baseBlast": 0.25,
 			"blastMultiplierBonus": 3.0,
-			"speedMultiplierBonus": 0.0
+			"speedMultiplierBonus": 3.0
 		}
 	},
 	"levels": [
