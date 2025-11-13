@@ -60,7 +60,9 @@
             "binaryDir": "${sourceDir}/temp/build/android-dev",
             "toolchainFile": "D:/Android/android-sdk/ndk/29.0.14206865/build/cmake/android.toolchain.cmake",
             "cacheVariables": {
-                "ANDROID_ABI": "arm64-v8a"
+                "ANDROID_ABI": "arm64-v8a",
+                "CC_HAS_EMBED_CONTENT": "ON",
+                "CC_HAS_EXECUTABLE_AS_LIBRARY": "ON"
             }
         },
         {
@@ -71,7 +73,8 @@
             "cacheVariables": {
                 "ANDROID_ABI": "arm64-v8a",
                 "CC_HAS_DEVUI": "OFF",
-                "CC_HAS_EMBED_CONTENT": "ON"
+                "CC_HAS_EMBED_CONTENT": "ON",
+                "CC_HAS_EXECUTABLE_AS_LIBRARY": "ON"
             }
         }
     ],
@@ -104,6 +107,16 @@
         {
             "name": "html5-release",
             "configurePreset": "html5-release",
+            "configuration": "Release"
+        },
+        {
+            "name": "android-dev",
+            "configurePreset": "android-dev",
+            "configuration": "Debug"
+        },
+        {
+            "name": "android-release",
+            "configurePreset": "android-release",
             "configuration": "Release"
         }
     ],
@@ -183,6 +196,32 @@
                 {
                     "type": "build",
                     "name": "html5-release"
+                }
+            ]
+        },
+        {
+            "name": "android-dev",
+            "steps": [
+                {
+                    "type": "configure",
+                    "name": "android-dev"
+                },
+                {
+                    "type": "build",
+                    "name": "android-dev"
+                }
+            ]
+        },
+        {
+            "name": "android-release",
+            "steps": [
+                {
+                    "type": "configure",
+                    "name": "android-release"
+                },
+                {
+                    "type": "build",
+                    "name": "android-release"
                 }
             ]
         }
