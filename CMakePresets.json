@@ -53,6 +53,26 @@
                 "CMAKE_EXE_LINKER_FLAGS": "--shell-file D:/emsdk/upstream/emscripten/src/shell_minimal.html",
                 "CMAKE_EXECUTABLE_SUFFIX_CXX": ".html"
             }
+        },
+        {
+            "name": "android-dev",
+            "generator": "Ninja Multi-Config",
+            "binaryDir": "${sourceDir}/temp/build/android-dev",
+            "toolchainFile": "D:/Android/android-sdk/ndk/29.0.14206865/build/cmake/android.toolchain.cmake",
+            "cacheVariables": {
+                "ANDROID_ABI": "arm64-v8a"
+            }
+        },
+        {
+            "name": "android-release",
+            "generator": "Ninja Multi-Config",
+            "binaryDir": "${sourceDir}/temp/build/android-release",
+            "toolchainFile": "D:/Android/android-sdk/ndk/29.0.14206865/build/cmake/android.toolchain.cmake",
+            "cacheVariables": {
+                "ANDROID_ABI": "arm64-v8a",
+                "CC_HAS_DEVUI": "OFF",
+                "CC_HAS_EMBED_CONTENT": "ON"
+            }
         }
     ],
     "buildPresets": [

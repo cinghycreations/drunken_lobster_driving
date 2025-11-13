@@ -1,3 +1,7 @@
 /temp/
 *.blend1
 imgui.ini
+.gradle/
+/android-project/build/
+/android-project/app/build/
+/android-project/app/libs/
