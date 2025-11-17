@@ -176,34 +176,24 @@ struct CarSettings {
 	float2 speedMultiplierRange = float2(1, 4);
 	float2 speedMultiplierStackedRange = float2(1, 5);
 	float speedMultiplierDecrease = 0.5f;
-	float2 blastMultiplierRange = float2(1, 5);
-	float2 blastMultiplierStackedRange = float2(1, 6);
-	float blastMultiplierDecrease = 0.5f;
 
-	NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(CarSettings, size, mouseSensibility, grip, baseSpeed, speedMultiplierRange, speedMultiplierStackedRange, speedMultiplierDecrease,
-												blastMultiplierRange, blastMultiplierStackedRange, blastMultiplierDecrease);
+	NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(CarSettings, size, mouseSensibility, grip, baseSpeed, speedMultiplierRange, speedMultiplierStackedRange, speedMultiplierDecrease);
 };
 
 struct BuildingSettings {
 	float speedMultiplierBonus = 0;
-	// float blastMultiplierBonus = 0;
-	// float baseBlast = 0;
 
-	NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(BuildingSettings, speedMultiplierBonus
-												// blastMultiplierBonus, baseBlast
-	);
+	NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(BuildingSettings, speedMultiplierBonus);
 };
 
 struct GameplaySettings {
 	std::array<std::string, 5> ranks = {"Lame Lobster", "Annoying Lobster", "Infamous Lobster", "Terrorist Lobster", "Worst Lobster Ever"};
-
 	float sequenceTime = 2.0f;
 	float threeInARowScore = 1000;
 	float fiveInARowScore = 3000;
 	float threeDifferentScore = 3000;
 	float skyscraperScoreMultiplier = 2;
 	float nuclearScoreMultiplier = 5;
-
 	BuildingSettings garden;
 	BuildingSettings house;
 	BuildingSettings gaspump;
@@ -277,14 +267,11 @@ void Settings::update(const Storage& storage) {
 			ImGui::DragFloat2("Speed Multiplier Range", &car.speedMultiplierRange.x, 0.01f);
 			ImGui::DragFloat2("Speed Multiplier Stacked Range", &car.speedMultiplierStackedRange.x, 0.01f);
 			ImGui::DragFloat("Speed Multiplier Decrease", &car.speedMultiplierDecrease, 0.01f);
-			ImGui::DragFloat2("Blast Multiplier Range", &car.blastMultiplierRange.x, 0.01f);
-			ImGui::DragFloat2("Blast Multiplier Stacked Range", &car.blastMultiplierStackedRange.x, 0.01f);
-			ImGui::DragFloat("Blast Multiplier Decrease", &car.blastMultiplierDecrease, 0.01f);
 		}
 
 		if (ImGui::CollapsingHeader("Gameplay", ImGuiTreeNodeFlags_DefaultOpen)) {
 			for (int category = 0; category < gameplay.ranks.size(); ++category) {
-				const std::string caption = fmt::format("Blast Category {}", category);
+				const std::string caption = fmt::format("Rank {}", category);
 				ImGui::InputText(caption.c_str(), &gameplay.ranks.at(category));
 			}
 			ImGui::Separator();
@@ -309,8 +296,6 @@ void Settings::update(const Storage& storage) {
 				ImGui::PushID(entry.first);
 				ImGui::Text("%s", entry.first);
 				ImGui::DragFloat("Speed Multiplier Bonus", &entry.second->speedMultiplierBonus, 0.01f);
-				// ImGui::DragFloat("Blast Multiplier Bonus", &entry.second->blastMultiplierBonus, 0.01f);
-				// ImGui::DragFloat("Base Blast", &entry.second->baseBlast, 0.01f);
 				ImGui::Separator();
 				ImGui::PopID();
 			}
@@ -323,7 +308,7 @@ void Settings::update(const Storage& storage) {
 				ImGui::InputText("Name", &levels.at(level).name);
 				ImGui::InputText("Path", &levels.at(level).path);
 				for (int category = 0; category < levels.at(level).rankThresholds.size(); ++category) {
-					const std::string caption = fmt::format("Blast Category Threshold {}", category);
+					const std::string caption = fmt::format("Rank Threshold {}", category);
 					ImGui::DragFloat(caption.c_str(), &levels.at(level).rankThresholds.at(category), 0.01f);
 				}
 				ImGui::Separator();
@@ -505,10 +490,6 @@ public:
 		return sequence;
 	}
 
-	// float getBlastMultiplier() const {
-	//	return carStats.blastMultiplier;
-	// }
-
 	const std::string& getRank() const;
 
 private:
@@ -524,13 +505,7 @@ private:
 	struct CarStats {
 		float speedStackedMultiplier = 0;
 		float speedMultiplier = 0;
-		// float blastStackedMultiplier = 0;
-		// float blastMultiplier = 0;
-		// float totalBlast = 0;
-		// float bestBlast = 0;
 		float score = 0;
-		// float lastSequenceScore = 0;
-		// float bestSequenceScore = 0;
 	};
 
 	const Settings& settings;
@@ -811,8 +786,6 @@ void Session::update(const std::chrono::microseconds real_delta_time) {
 		ImGui::BeginDisabled(paused);
 		ImGui::Text("Speed Stacked Multiplier: %f", carStats.speedStackedMultiplier);
 		ImGui::Text("Speed Multiplier: %f", carStats.speedMultiplier);
-		// ImGui::Text("Last Sequence Score: %f", carStats.lastSequenceScore);
-		// ImGui::Text("Best Sequence Score: %f", carStats.bestSequenceScore);
 		ImGui::Text("Score: %f", carStats.score);
 		ImGui::Text("Sequence Size: %d", sequence.size());
 		ImGui::Text("Sequence Time Left: %f", TimeUtils::microsecondsToFloatSeconds(sequenceTimeLeft));
@@ -909,9 +882,6 @@ std::string Session::debugRenderSequence(const std::vector<Session::BuildingType
 }
 
 void Session::updateCarStats(const std::chrono::microseconds delta_time) {
-	// carStats.blastStackedMultiplier -= settings.car.blastMultiplierDecrease * TimeUtils::microsecondsToFloatSeconds(delta_time);
-	// carStats.blastStackedMultiplier = std::clamp<float>(carStats.blastStackedMultiplier, settings.car.blastMultiplierStackedRange.x, settings.car.blastMultiplierStackedRange.y);
-	// carStats.blastMultiplier = std::clamp<float>(carStats.blastStackedMultiplier, settings.car.blastMultiplierRange.x, settings.car.blastMultiplierRange.y);
 	carStats.speedStackedMultiplier -= settings.car.speedMultiplierDecrease * TimeUtils::microsecondsToFloatSeconds(delta_time);
 	carStats.speedStackedMultiplier = std::clamp<float>(carStats.speedStackedMultiplier, settings.car.speedMultiplierStackedRange.x, settings.car.speedMultiplierStackedRange.y);
 	carStats.speedMultiplier = std::clamp<float>(carStats.speedStackedMultiplier, settings.car.speedMultiplierRange.x, settings.car.speedMultiplierRange.y);
@@ -1311,8 +1281,6 @@ private:
 	std::string sequence;
 	int score;
 	std::string rank;
-	// std::string blastMultiplier;
-	// std::string blastCategory;
 	bool resultsShown = false;
 	int countdown = 0;
 
