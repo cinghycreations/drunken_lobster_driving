@@ -186,29 +186,40 @@ struct CarSettings {
 
 struct BuildingSettings {
 	float speedMultiplierBonus = 0;
-	float blastMultiplierBonus = 0;
-	float baseBlast = 0;
+	// float blastMultiplierBonus = 0;
+	// float baseBlast = 0;
 
-	NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(BuildingSettings, speedMultiplierBonus, blastMultiplierBonus, baseBlast);
+	NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(BuildingSettings, speedMultiplierBonus
+												// blastMultiplierBonus, baseBlast
+	);
 };
 
 struct GameplaySettings {
-	std::array<std::string, 5> blastCategories = {"Lame Lobster", "Annoying Lobster", "Infamous Lobster", "Terrorist Lobster", "Worst Lobster Ever"};
+	std::array<std::string, 5> ranks = {"Lame Lobster", "Annoying Lobster", "Infamous Lobster", "Terrorist Lobster", "Worst Lobster Ever"};
+
+	float sequenceTime = 2.0f;
+	float threeInARowScore = 1000;
+	float fiveInARowScore = 3000;
+	float threeDifferentScore = 3000;
+	float skyscraperScoreMultiplier = 2;
+	float nuclearScoreMultiplier = 5;
+
 	BuildingSettings garden;
 	BuildingSettings house;
 	BuildingSettings gaspump;
 	BuildingSettings skyscraper;
 	BuildingSettings nuclear;
 
-	NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(GameplaySettings, blastCategories, garden, house, gaspump, skyscraper, nuclear);
+	NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(GameplaySettings, sequenceTime, threeInARowScore, fiveInARowScore, threeDifferentScore, skyscraperScoreMultiplier,
+												nuclearScoreMultiplier, ranks, garden, house, gaspump, skyscraper, nuclear);
 };
 
 struct LevelSettings {
 	std::string name;
 	std::string path;
-	std::array<float, 5> blastCategoryThresholds = {0, 1, 2, 3, 4};
+	std::array<float, 5> rankThresholds = {0, 1, 2, 3, 4};
 
-	NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(LevelSettings, name, path, blastCategoryThresholds);
+	NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(LevelSettings, name, path, rankThresholds);
 };
 
 struct Settings {
@@ -272,10 +283,18 @@ void Settings::update(const Storage& storage) {
 		}
 
 		if (ImGui::CollapsingHeader("Gameplay", ImGuiTreeNodeFlags_DefaultOpen)) {
-			for (int category = 0; category < gameplay.blastCategories.size(); ++category) {
+			for (int category = 0; category < gameplay.ranks.size(); ++category) {
 				const std::string caption = fmt::format("Blast Category {}", category);
-				ImGui::InputText(caption.c_str(), &gameplay.blastCategories.at(category));
+				ImGui::InputText(caption.c_str(), &gameplay.ranks.at(category));
 			}
+			ImGui::Separator();
+
+			ImGui::DragFloat("Sequence Time", &gameplay.sequenceTime, 0.01f);
+			ImGui::DragFloat("Three In A Row Score", &gameplay.threeInARowScore, 0.01f);
+			ImGui::DragFloat("Five In A Row Score", &gameplay.fiveInARowScore, 0.01f);
+			ImGui::DragFloat("Three Different Score", &gameplay.threeDifferentScore, 0.01f);
+			ImGui::DragFloat("Skyscraper Score Multiplier", &gameplay.skyscraperScoreMultiplier, 0.01f);
+			ImGui::DragFloat("Nuclear Score Multiplier", &gameplay.nuclearScoreMultiplier, 0.01f);
 			ImGui::Separator();
 
 			const std::array<std::pair<const char*, BuildingSettings*>, 5> entries = {{
@@ -290,8 +309,8 @@ void Settings::update(const Storage& storage) {
 				ImGui::PushID(entry.first);
 				ImGui::Text("%s", entry.first);
 				ImGui::DragFloat("Speed Multiplier Bonus", &entry.second->speedMultiplierBonus, 0.01f);
-				ImGui::DragFloat("Blast Multiplier Bonus", &entry.second->blastMultiplierBonus, 0.01f);
-				ImGui::DragFloat("Base Blast", &entry.second->baseBlast, 0.01f);
+				// ImGui::DragFloat("Blast Multiplier Bonus", &entry.second->blastMultiplierBonus, 0.01f);
+				// ImGui::DragFloat("Base Blast", &entry.second->baseBlast, 0.01f);
 				ImGui::Separator();
 				ImGui::PopID();
 			}
@@ -303,9 +322,9 @@ void Settings::update(const Storage& storage) {
 				ImGui::Text("Level %d", level);
 				ImGui::InputText("Name", &levels.at(level).name);
 				ImGui::InputText("Path", &levels.at(level).path);
-				for (int category = 0; category < levels.at(level).blastCategoryThresholds.size(); ++category) {
+				for (int category = 0; category < levels.at(level).rankThresholds.size(); ++category) {
 					const std::string caption = fmt::format("Blast Category Threshold {}", category);
-					ImGui::DragFloat(caption.c_str(), &levels.at(level).blastCategoryThresholds.at(category), 0.01f);
+					ImGui::DragFloat(caption.c_str(), &levels.at(level).rankThresholds.at(category), 0.01f);
 				}
 				ImGui::Separator();
 				ImGui::PopID();
@@ -438,6 +457,16 @@ float2 CameraShaker::shakeSinusoidal(const float time, const float period) {
 
 class Session {
 public:
+	enum class BuildingType {
+		None,
+		Impassable,
+		Garden,
+		House,
+		GasPump,
+		Skyscraper,
+		Nuclear,
+	};
+
 	Session(const Settings& _settings, const Storage& _storage, const Content& _content, SDL_Window* _window, SDL_Renderer* _renderer, const int level_index);
 	~Session();
 
@@ -468,23 +497,21 @@ public:
 		return carStats.speedMultiplier;
 	}
 
-	float getBlastMultiplier() const {
-		return carStats.blastMultiplier;
+	float getScore() const {
+		return carStats.score;
 	}
 
-	const std::string& getBlastCategory() const;
+	const std::vector<BuildingType> getSequence() const {
+		return sequence;
+	}
+
+	// float getBlastMultiplier() const {
+	//	return carStats.blastMultiplier;
+	// }
+
+	const std::string& getRank() const;
 
 private:
-	enum class BuildingType {
-		None,
-		Impassable,
-		Garden,
-		House,
-		GasPump,
-		Skyscraper,
-		Nuclear,
-	};
-
 	struct CellState {
 		int groundTile;
 		int buildingTile;
@@ -497,10 +524,13 @@ private:
 	struct CarStats {
 		float speedStackedMultiplier = 0;
 		float speedMultiplier = 0;
-		float blastStackedMultiplier = 0;
-		float blastMultiplier = 0;
-		float totalBlast = 0;
-		float bestBlast = 0;
+		// float blastStackedMultiplier = 0;
+		// float blastMultiplier = 0;
+		// float totalBlast = 0;
+		// float bestBlast = 0;
+		float score = 0;
+		// float lastSequenceScore = 0;
+		// float bestSequenceScore = 0;
 	};
 
 	const Settings& settings;
@@ -517,6 +547,9 @@ private:
 	CameraShaker cameraShaker;
 
 	CarStats carStats;
+	std::vector<BuildingType> sequence;
+	std::chrono::microseconds sequenceTimeLeft;
+	std::vector<std::pair<std::string, float>> sequences;
 
 	float2 carPrevPosition = {0.5f, 0.5f};
 	float2 carPosition = {0.5f, 0.5f};
@@ -537,6 +570,9 @@ private:
 	float2 getRenderDirectionY() const;
 	float2 worldToRender(const float2 world_coords) const;
 
+	static float scoreSequence(const Settings& settings, const std::vector<BuildingType>& sequence);
+	static std::string debugRenderSequence(const std::vector<Session::BuildingType>& sequence);
+
 	void updateCarStats(const std::chrono::microseconds delta_time);
 	void updateCarDrive(const std::chrono::microseconds delta_time);
 	void updateCarCollisions(const std::chrono::microseconds total_time);
@@ -547,7 +583,8 @@ private:
 };
 
 Session::Session(const Settings& _settings, const Storage& _storage, const Content& _content, SDL_Window* _window, SDL_Renderer* _renderer, const int level_index)
-	: settings(_settings), storage(_storage), content(_content), window(_window), renderer(_renderer), levelIndex(level_index), countdownTime(3000000 - 1), sessionTotalTime(0) {
+	: settings(_settings), storage(_storage), content(_content), window(_window), renderer(_renderer), levelIndex(level_index), sequenceTimeLeft(0), countdownTime(3000000 - 1),
+	  sessionTotalTime(0) {
 
 	const std::filesystem::path level_path = settings.levels.at(level_index).path;
 
@@ -759,6 +796,12 @@ void Session::update(const std::chrono::microseconds real_delta_time) {
 
 	if (!finishTime.has_value() && isGameFinished()) {
 		finishTime = sessionTotalTime;
+		if (!sequence.empty()) {
+			const float sequence_score = Session::scoreSequence(settings, sequence);
+			sequences.emplace_back(Session::debugRenderSequence(sequence), sequence_score);
+			carStats.score += sequence_score;
+			sequence.clear();
+		}
 	}
 
 #ifdef CC_HAS_DEVUI
@@ -768,15 +811,19 @@ void Session::update(const std::chrono::microseconds real_delta_time) {
 		ImGui::BeginDisabled(paused);
 		ImGui::Text("Speed Stacked Multiplier: %f", carStats.speedStackedMultiplier);
 		ImGui::Text("Speed Multiplier: %f", carStats.speedMultiplier);
-		ImGui::Text("Blast Stacked Multiplier: %f", carStats.blastStackedMultiplier);
-		ImGui::Text("Blast Multiplier: %f", carStats.blastMultiplier);
-		ImGui::Text("Total Blast: %f", carStats.totalBlast);
-		ImGui::Text("Best Blast: %f", carStats.bestBlast);
+		// ImGui::Text("Last Sequence Score: %f", carStats.lastSequenceScore);
+		// ImGui::Text("Best Sequence Score: %f", carStats.bestSequenceScore);
+		ImGui::Text("Score: %f", carStats.score);
+		ImGui::Text("Sequence Size: %d", sequence.size());
+		ImGui::Text("Sequence Time Left: %f", TimeUtils::microsecondsToFloatSeconds(sequenceTimeLeft));
 		ImGui::Text("Session Total Time: %.2fs", TimeUtils::microsecondsToFloatSeconds(sessionTotalTime));
 		if (!finishTime.has_value()) {
 			ImGui::Text("Finish Time: none");
 		} else {
 			ImGui::Text("Finish Time: %.2fs", TimeUtils::microsecondsToFloatSeconds(*finishTime));
+		}
+		for (int sequence_index = 0; sequence_index < sequences.size(); ++sequence_index) {
+			ImGui::Text("Sequence %d: %s, %f", sequence_index, sequences.at(sequence_index).first.c_str(), sequences.at(sequence_index).second);
 		}
 		ImGui::EndDisabled();
 	}
@@ -784,13 +831,102 @@ void Session::update(const std::chrono::microseconds real_delta_time) {
 #endif
 }
 
+float Session::scoreSequence(const Settings& settings, const std::vector<BuildingType>& sequence) {
+	float base = 0;
+	float mult = 1;
+	int i = 0;
+
+	for (const BuildingType& building : sequence) {
+		SDL_assert(building != Session::BuildingType::None && building != Session::BuildingType::Impassable);
+	}
+
+	while (i < sequence.size()) {
+		const bool five_in_a_row = i + 4 < sequence.size() && sequence.at(i) == sequence.at(i + 1) && sequence.at(i) == sequence.at(i + 2) &&
+								   sequence.at(i) == sequence.at(i + 3) && sequence.at(i) == sequence.at(i + 4) && sequence.at(i) != BuildingType::Skyscraper &&
+								   sequence.at(i) != BuildingType::Nuclear && sequence.at(i + 1) != BuildingType::Skyscraper && sequence.at(i + 1) != BuildingType::Nuclear &&
+								   sequence.at(i + 2) != BuildingType::Skyscraper && sequence.at(i + 2) != BuildingType::Nuclear &&
+								   sequence.at(i + 3) != BuildingType::Skyscraper && sequence.at(i + 3) != BuildingType::Nuclear &&
+								   sequence.at(i + 4) != BuildingType::Skyscraper && sequence.at(i + 4) != BuildingType::Nuclear;
+
+		const bool three_in_a_row = i + 2 < sequence.size() && sequence.at(i) == sequence.at(i + 1) && sequence.at(i) == sequence.at(i + 2) &&
+									sequence.at(i) != BuildingType::Skyscraper && sequence.at(i) != BuildingType::Nuclear && sequence.at(i + 1) != BuildingType::Skyscraper &&
+									sequence.at(i + 1) != BuildingType::Nuclear && sequence.at(i + 2) != BuildingType::Skyscraper && sequence.at(i + 2) != BuildingType::Nuclear;
+
+		const bool three_different = i + 2 < sequence.size() && sequence.at(i) != sequence.at(i + 1) && sequence.at(i) != sequence.at(i + 2) &&
+									 sequence.at(i + 1) != sequence.at(i + 2) && sequence.at(i) != BuildingType::Skyscraper && sequence.at(i) != BuildingType::Nuclear &&
+									 sequence.at(i + 1) != BuildingType::Skyscraper && sequence.at(i + 1) != BuildingType::Nuclear &&
+									 sequence.at(i + 2) != BuildingType::Skyscraper && sequence.at(i + 2) != BuildingType::Nuclear;
+
+		if (sequence.at(i) == BuildingType::Skyscraper) {
+			mult *= settings.gameplay.skyscraperScoreMultiplier;
+			i += 1;
+		} else if (sequence.at(i) == BuildingType::Nuclear) {
+			mult *= settings.gameplay.nuclearScoreMultiplier;
+			i += 1;
+		} else if (five_in_a_row) {
+			base += settings.gameplay.fiveInARowScore;
+			i += 5;
+		} else if (three_in_a_row) {
+			base += settings.gameplay.threeInARowScore;
+			i += 3;
+		} else if (three_different) {
+			base += settings.gameplay.threeDifferentScore;
+			i += 3;
+		} else {
+			i += 1;
+		}
+	}
+
+	return base * mult;
+}
+
+std::string Session::debugRenderSequence(const std::vector<Session::BuildingType>& sequence) {
+	std::string result;
+	result.reserve(sequence.size());
+
+	for (const Session::BuildingType& building : sequence) {
+		SDL_assert(building != Session::BuildingType::None && building != Session::BuildingType::Impassable);
+		switch (building) {
+		case Session::BuildingType::Garden:
+			result.push_back('G');
+			break;
+		case Session::BuildingType::House:
+			result.push_back('H');
+			break;
+		case Session::BuildingType::GasPump:
+			result.push_back('P');
+			break;
+		case Session::BuildingType::Skyscraper:
+			result.push_back('S');
+			break;
+		case Session::BuildingType::Nuclear:
+			result.push_back('N');
+			break;
+		}
+	}
+
+	return result;
+}
+
 void Session::updateCarStats(const std::chrono::microseconds delta_time) {
-	carStats.blastStackedMultiplier -= settings.car.blastMultiplierDecrease * TimeUtils::microsecondsToFloatSeconds(delta_time);
-	carStats.blastStackedMultiplier = std::clamp<float>(carStats.blastStackedMultiplier, settings.car.blastMultiplierStackedRange.x, settings.car.blastMultiplierStackedRange.y);
-	carStats.blastMultiplier = std::clamp<float>(carStats.blastStackedMultiplier, settings.car.blastMultiplierRange.x, settings.car.blastMultiplierRange.y);
+	// carStats.blastStackedMultiplier -= settings.car.blastMultiplierDecrease * TimeUtils::microsecondsToFloatSeconds(delta_time);
+	// carStats.blastStackedMultiplier = std::clamp<float>(carStats.blastStackedMultiplier, settings.car.blastMultiplierStackedRange.x, settings.car.blastMultiplierStackedRange.y);
+	// carStats.blastMultiplier = std::clamp<float>(carStats.blastStackedMultiplier, settings.car.blastMultiplierRange.x, settings.car.blastMultiplierRange.y);
 	carStats.speedStackedMultiplier -= settings.car.speedMultiplierDecrease * TimeUtils::microsecondsToFloatSeconds(delta_time);
 	carStats.speedStackedMultiplier = std::clamp<float>(carStats.speedStackedMultiplier, settings.car.speedMultiplierStackedRange.x, settings.car.speedMultiplierStackedRange.y);
 	carStats.speedMultiplier = std::clamp<float>(carStats.speedStackedMultiplier, settings.car.speedMultiplierRange.x, settings.car.speedMultiplierRange.y);
+
+	if (delta_time >= sequenceTimeLeft) {
+		sequenceTimeLeft = std::chrono::microseconds(0);
+		if (!sequence.empty()) {
+			const float sequence_score = Session::scoreSequence(settings, sequence);
+			sequences.emplace_back(Session::debugRenderSequence(sequence), sequence_score);
+			carStats.score += sequence_score;
+			sequence.clear();
+		}
+	} else {
+		sequenceTimeLeft -= delta_time;
+	}
 }
 
 void Session::updateCarDrive(const std::chrono::microseconds delta_time) {
@@ -903,11 +1039,10 @@ void Session::updateCarCollisions(const std::chrono::microseconds total_time) {
 		cell.destructionTime = total_time;
 
 		carStats.speedStackedMultiplier += building_settings->speedMultiplierBonus;
-		carStats.blastStackedMultiplier += building_settings->blastMultiplierBonus;
-		const float blast = carStats.blastMultiplier * building_settings->baseBlast;
-		carStats.totalBlast += blast;
-		carStats.bestBlast = std::max(carStats.bestBlast, blast);
+		sequence.push_back(cell.buildingType);
+		sequenceTimeLeft = TimeUtils::floatSecondsToMicroseconds(settings.gameplay.sequenceTime);
 
+		const float blast = Session::scoreSequence(settings, sequence) / 1000;
 		cameraShaker.shake(settings.camera.shake.durationBase + settings.camera.shake.durationCoeff * blast,
 						   settings.camera.shake.periodBase + settings.camera.shake.periodCoeff * blast,
 						   settings.camera.shake.strengthBase + settings.camera.shake.strengthCoeff * blast);
@@ -959,6 +1094,9 @@ void Session::restart() {
 	countdownTime = std::chrono::microseconds(3000000 - 1);
 	sessionTotalTime = std::chrono::microseconds(0);
 	finishTime.reset();
+	sequence.clear();
+	sequenceTimeLeft = std::chrono::microseconds(0);
+	sequences.clear();
 	paused = false;
 }
 
@@ -1082,20 +1220,20 @@ void Session::renderGrid() {
 	}
 }
 
-const std::string& Session::getBlastCategory() const {
-	SDL_assert(!settings.levels.at(levelIndex).blastCategoryThresholds.empty());
-	SDL_assert(settings.levels.at(levelIndex).blastCategoryThresholds.size() == settings.gameplay.blastCategories.size());
-	SDL_assert(settings.levels.at(levelIndex).blastCategoryThresholds.front() == 0);
+const std::string& Session::getRank() const {
+	SDL_assert(!settings.levels.at(levelIndex).rankThresholds.empty());
+	SDL_assert(settings.levels.at(levelIndex).rankThresholds.size() == settings.gameplay.ranks.size());
+	SDL_assert(settings.levels.at(levelIndex).rankThresholds.front() == 0);
 
 	int selected_category = 0;
-	for (int category = 1; category < settings.levels.at(levelIndex).blastCategoryThresholds.size(); ++category) {
-		const float threshold = settings.levels.at(levelIndex).blastCategoryThresholds.at(category);
-		if (carStats.bestBlast >= threshold) {
+	for (int category = 1; category < settings.levels.at(levelIndex).rankThresholds.size(); ++category) {
+		const float threshold = settings.levels.at(levelIndex).rankThresholds.at(category);
+		if (carStats.score >= threshold) {
 			selected_category = category;
 		}
 	}
 
-	return settings.gameplay.blastCategories.at(selected_category);
+	return settings.gameplay.ranks.at(selected_category);
 }
 
 //////////////
@@ -1170,8 +1308,11 @@ private:
 	std::vector<Rml::String> levelNames;
 	std::vector<Rml::String> levelRanks;
 	std::string speedMultiplier;
-	std::string blastMultiplier;
-	std::string blastCategory;
+	std::string sequence;
+	int score;
+	std::string rank;
+	// std::string blastMultiplier;
+	// std::string blastCategory;
 	bool resultsShown = false;
 	int countdown = 0;
 
@@ -1202,6 +1343,8 @@ private:
 
 	void renderBackground();
 	void captureMouse(const bool capture);
+
+	static std::string renderSequence(const std::vector<Session::BuildingType>& sequence);
 };
 
 Launcher::Launcher(const Settings& _settings, const Storage& _storage, Content& _content, SDL_Window* _window, SDL_Renderer* _renderer, Rml::Context* ui_context)
@@ -1211,7 +1354,7 @@ Launcher::Launcher(const Settings& _settings, const Storage& _storage, Content& 
 	levelRanks.resize(10);
 	for (int i = 0; i < levelNames.size(); ++i) {
 		levelNames.at(i) = i < settings.levels.size() ? settings.levels.at(i).name : "<none>";
-		levelRanks.at(i) = i < settings.levels.size() ? settings.gameplay.blastCategories.front() : "<none>";
+		levelRanks.at(i) = i < settings.levels.size() ? settings.gameplay.ranks.front() : "<none>";
 	}
 
 	{
@@ -1238,8 +1381,9 @@ Launcher::Launcher(const Settings& _settings, const Storage& _storage, Content& 
 		session_model_ctor.BindEventCallback("restartSession", &Launcher::restartSession, this);
 		session_model_ctor.BindEventCallback("exitSession", &Launcher::exitSession, this);
 		session_model_ctor.Bind("speedMultiplier", &speedMultiplier);
-		session_model_ctor.Bind("blastMultiplier", &blastMultiplier);
-		session_model_ctor.Bind("blastCategory", &blastCategory);
+		session_model_ctor.Bind("sequence", &sequence);
+		session_model_ctor.Bind("score", &score);
+		session_model_ctor.Bind("rank", &rank);
 		session_model_ctor.Bind("countdown", &countdown);
 		sessionModel = session_model_ctor.GetModelHandle();
 	}
@@ -1278,11 +1422,14 @@ void Launcher::update(const std::chrono::microseconds real_total_time, const std
 		speedMultiplier = fmt::format("{:.01f}", session->getSpeedMultiplier());
 		sessionModel.DirtyVariable("speedMultiplier");
 
-		blastMultiplier = fmt::format("{:.01f}", session->getBlastMultiplier());
-		sessionModel.DirtyVariable("blastMultiplier");
+		sequence = Launcher::renderSequence(session->getSequence());
+		sessionModel.DirtyVariable("sequence");
 
-		blastCategory = session->getBlastCategory();
-		sessionModel.DirtyVariable("blastCategory");
+		score = int(session->getScore());
+		sessionModel.DirtyVariable("score");
+
+		rank = session->getRank();
+		sessionModel.DirtyVariable("rank");
 
 		countdown = (session->getCountdownTime().count() + 999999) / 1000000;
 		sessionModel.DirtyVariable("countdown");
@@ -1437,6 +1584,34 @@ void Launcher::renderBackground() {
 void Launcher::captureMouse(const bool capture) {
 	const bool mouse_mode_ok = SDL_SetWindowRelativeMouseMode(window, capture);
 	SDL_assert(mouse_mode_ok);
+}
+
+std::string Launcher::renderSequence(const std::vector<Session::BuildingType>& sequence) {
+	std::string result;
+	result.reserve(sequence.size());
+
+	for (const Session::BuildingType& building : sequence) {
+		SDL_assert(building != Session::BuildingType::None && building != Session::BuildingType::Impassable);
+		switch (building) {
+		case Session::BuildingType::Garden:
+			result.push_back('G');
+			break;
+		case Session::BuildingType::House:
+			result.push_back('H');
+			break;
+		case Session::BuildingType::GasPump:
+			result.push_back('P');
+			break;
+		case Session::BuildingType::Skyscraper:
+			result.push_back('S');
+			break;
+		case Session::BuildingType::Nuclear:
+			result.push_back('N');
+			break;
+		}
+	}
+
+	return result;
 }
 
 /////////
