@@ -55,6 +55,11 @@
  "orientation":"isometric",
  "properties":[
         {
+         "name":"name",
+         "type":"string",
+         "value":"Menace is Coming"
+        }, 
+        {
          "name":"startX",
          "type":"int",
          "value":2
@@ -63,6 +68,16 @@
          "name":"startY",
          "type":"int",
          "value":10
+        }, 
+        {
+         "name":"targetScore",
+         "type":"float",
+         "value":10000
+        }, 
+        {
+         "name":"targetTime",
+         "type":"float",
+         "value":60
         }],
  "renderorder":"right-down",
  "tiledversion":"1.11.2",

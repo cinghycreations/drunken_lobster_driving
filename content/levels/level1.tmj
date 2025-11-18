@@ -56,31 +56,6 @@
          "value":"Small Village"
         }, 
         {
-         "name":"rank0Threshold",
-         "type":"float",
-         "value":0
-        }, 
-        {
-         "name":"rank1Threshold",
-         "type":"float",
-         "value":0
-        }, 
-        {
-         "name":"rank2Threshold",
-         "type":"float",
-         "value":0
-        }, 
-        {
-         "name":"rank3Threshold",
-         "type":"float",
-         "value":0
-        }, 
-        {
-         "name":"rank4Threshold",
-         "type":"float",
-         "value":0
-        }, 
-        {
          "name":"startX",
          "type":"int",
          "value":3
@@ -89,6 +64,16 @@
          "name":"startY",
          "type":"int",
          "value":7
+        }, 
+        {
+         "name":"targetScore",
+         "type":"float",
+         "value":10000
+        }, 
+        {
+         "name":"targetTime",
+         "type":"float",
+         "value":60
         }],
  "renderorder":"right-down",
  "tiledversion":"1.11.2",

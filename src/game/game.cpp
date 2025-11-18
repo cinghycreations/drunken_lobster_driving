@@ -204,24 +204,15 @@ struct GameplaySettings {
 												nuclearScoreMultiplier, ranks, garden, house, gaspump, skyscraper, nuclear);
 };
 
-struct LevelSettings {
-	std::string name;
-	std::string path;
-	std::array<float, 5> rankThresholds = {0, 1, 2, 3, 4};
-
-	NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(LevelSettings, name, path, rankThresholds);
-};
-
 struct Settings {
 	RenderSettings render;
 	CameraSettings camera;
 	CarSettings car;
 	GameplaySettings gameplay;
-	std::vector<LevelSettings> levels = {LevelSettings{.name = "Testbed", .path = "levels/testbed.tmj"}};
 
 	void update(const Storage& storage);
 
-	NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(Settings, camera, car, gameplay, levels);
+	NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(Settings, camera, car, gameplay);
 };
 
 void Settings::update(const Storage& storage) {
@@ -270,9 +261,9 @@ void Settings::update(const Storage& storage) {
 		}
 
 		if (ImGui::CollapsingHeader("Gameplay", ImGuiTreeNodeFlags_DefaultOpen)) {
-			for (int category = 0; category < gameplay.ranks.size(); ++category) {
-				const std::string caption = fmt::format("Rank {}", category);
-				ImGui::InputText(caption.c_str(), &gameplay.ranks.at(category));
+			for (int rank = 0; rank < gameplay.ranks.size(); ++rank) {
+				const std::string caption = fmt::format("Rank {}", rank);
+				ImGui::InputText(caption.c_str(), &gameplay.ranks.at(rank));
 			}
 			ImGui::Separator();
 
@@ -300,32 +291,27 @@ void Settings::update(const Storage& storage) {
 				ImGui::PopID();
 			}
 		}
-
-		if (ImGui::CollapsingHeader("Levels", ImGuiTreeNodeFlags_DefaultOpen)) {
-			for (int level = 0; level < levels.size(); ++level) {
-				ImGui::PushID(level);
-				ImGui::Text("Level %d", level);
-				ImGui::InputText("Name", &levels.at(level).name);
-				ImGui::InputText("Path", &levels.at(level).path);
-				for (int category = 0; category < levels.at(level).rankThresholds.size(); ++category) {
-					const std::string caption = fmt::format("Rank Threshold {}", category);
-					ImGui::DragFloat(caption.c_str(), &levels.at(level).rankThresholds.at(category), 0.01f);
-				}
-				ImGui::Separator();
-				ImGui::PopID();
-			}
-			if (ImGui::Button("Add")) {
-				levels.emplace_back();
-			}
-			ImGui::SameLine();
-			if (ImGui::Button("Delete") && levels.size() > 0) {
-				levels.pop_back();
-			}
-		}
 	}
 	ImGui::End();
 #endif
 }
+
+//////////////
+// Savegame //
+//////////////
+
+struct LevelRecord {
+	float score = -1;
+	float time = -1;
+
+	NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(LevelRecord, score, time);
+};
+
+struct Savegame {
+	std::vector<LevelRecord> records;
+
+	NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(Savegame, records);
+};
 
 /////////////
 // Content //
@@ -452,7 +438,7 @@ public:
 		Nuclear,
 	};
 
-	Session(const Settings& _settings, const Storage& _storage, const Content& _content, SDL_Window* _window, SDL_Renderer* _renderer, const int level_index);
+	Session(const Settings& _settings, const Storage& _storage, const Content& _content, SDL_Window* _window, SDL_Renderer* _renderer, const std::filesystem::path& level_path);
 	~Session();
 
 	void update(const std::chrono::microseconds delta_real_time);
@@ -470,11 +456,15 @@ public:
 		return finishTime.has_value();
 	}
 
-	std::chrono::microseconds getSessionTime() {
-		return sessionTotalTime;
+	float getSessionTime() const {
+		return TimeUtils::microsecondsToFloatSeconds(sessionTotalTime);
 	}
 
-	std::chrono::microseconds getCountdownTime() {
+	float getFinishTime() const {
+		return TimeUtils::microsecondsToFloatSeconds(*finishTime);
+	}
+
+	std::chrono::microseconds getCountdownTime() const {
 		return countdownTime;
 	}
 
@@ -490,7 +480,8 @@ public:
 		return sequence;
 	}
 
-	const std::string& getRank() const;
+	static const std::string& getScoreRank(const Settings& settings, const float score, const float target_score);
+	static const std::string& getTimeRank(const Settings& settings, const float time, const float target_time);
 
 private:
 	struct CellState {
@@ -513,7 +504,6 @@ private:
 	const Content& content;
 	SDL_Window* window;
 	SDL_Renderer* renderer;
-	int levelIndex;
 	int2 worldSize;
 	float2 worldStartingPosition = {0.5f, 0.5f};
 	bool renderEnableGrid = false;
@@ -557,11 +547,8 @@ private:
 	void renderGrid();
 };
 
-Session::Session(const Settings& _settings, const Storage& _storage, const Content& _content, SDL_Window* _window, SDL_Renderer* _renderer, const int level_index)
-	: settings(_settings), storage(_storage), content(_content), window(_window), renderer(_renderer), levelIndex(level_index), sequenceTimeLeft(0), countdownTime(3000000 - 1),
-	  sessionTotalTime(0) {
-
-	const std::filesystem::path level_path = settings.levels.at(level_index).path;
+Session::Session(const Settings& _settings, const Storage& _storage, const Content& _content, SDL_Window* _window, SDL_Renderer* _renderer, const std::filesystem::path& level_path)
+	: settings(_settings), storage(_storage), content(_content), window(_window), renderer(_renderer), sequenceTimeLeft(0), countdownTime(3000000 - 1), sessionTotalTime(0) {
 
 	SDL_IOStream* level_stream = storage.open(level_path);
 	size_t level_data_size = 0;
@@ -654,9 +641,10 @@ Session::Session(const Settings& _settings, const Storage& _storage, const Conte
 		}
 	}
 
-	if (level->getProp("startX") && level->getProp("startY")) {
-		worldStartingPosition = float2(level->getProp("startX")->getValue<int>(), level->getProp("startY")->getValue<int>()) + float2(0.5f);
-	}
+	SDL_assert(level->getProp("startX"));
+	SDL_assert(level->getProp("startY"));
+
+	worldStartingPosition = float2(level->getProp("startX")->getValue<int>(), level->getProp("startY")->getValue<int>()) + float2(0.5f);
 	carPosition = worldStartingPosition;
 }
 
@@ -1190,20 +1178,24 @@ void Session::renderGrid() {
 	}
 }
 
-const std::string& Session::getRank() const {
-	SDL_assert(!settings.levels.at(levelIndex).rankThresholds.empty());
-	SDL_assert(settings.levels.at(levelIndex).rankThresholds.size() == settings.gameplay.ranks.size());
-	SDL_assert(settings.levels.at(levelIndex).rankThresholds.front() == 0);
+const std::string& Session::getScoreRank(const Settings& settings, const float score, const float target_score) {
+	SDL_assert(target_score > 0);
+	SDL_assert(settings.gameplay.ranks.size() > 0);
 
-	int selected_category = 0;
-	for (int category = 1; category < settings.levels.at(levelIndex).rankThresholds.size(); ++category) {
-		const float threshold = settings.levels.at(levelIndex).rankThresholds.at(category);
-		if (carStats.score >= threshold) {
-			selected_category = category;
-		}
-	}
+	int rank = int((score / target_score) * settings.gameplay.ranks.size());
+	rank = std::clamp<int>(rank, 0, settings.gameplay.ranks.size() - 1);
 
-	return settings.gameplay.ranks.at(selected_category);
+	return settings.gameplay.ranks.at(rank);
+}
+
+const std::string& Session::getTimeRank(const Settings& settings, const float time, const float target_time) {
+	SDL_assert(target_time > 0);
+	SDL_assert(settings.gameplay.ranks.size() > 0);
+
+	int rank = int(((target_time * 2 - time) / target_time) * settings.gameplay.ranks.size());
+	rank = std::clamp<int>(rank, 0, settings.gameplay.ranks.size() - 1);
+
+	return settings.gameplay.ranks.at(rank);
 }
 
 //////////////
@@ -1264,6 +1256,11 @@ public:
 	}
 
 private:
+	enum class GameMode {
+		Destruction,
+		TimeAttack,
+	};
+
 	const Settings& settings;
 	const Storage& storage;
 	Content& content;
@@ -1276,21 +1273,36 @@ private:
 	std::string buildVersion = "v0";
 	std::string buildDate = __DATE__ " " __TIME__;
 	std::vector<Rml::String> levelNames;
-	std::vector<Rml::String> levelRanks;
+	std::vector<Rml::String> levelScores;
+	std::vector<Rml::String> levelScoreRanks;
+	std::vector<Rml::String> levelTimes;
+	std::vector<Rml::String> levelTimeRanks;
 	std::string speedMultiplier;
 	std::string sequence;
 	int score;
-	std::string rank;
-	bool resultsShown = false;
+	std::string time;
 	int countdown = 0;
+	std::string finishedRank;
 
-	Rml::ElementDocument* document = nullptr;
+	std::vector<float> levelTargetScores;
+	std::vector<float> levelTargetTimes;
+	Savegame savegame;
 
 	std::unique_ptr<Session> session;
+	GameMode sessionGameMode = GameMode::Destruction;
+	int sessionLevelIndex = -1;
+
+	Rml::ElementDocument* document = nullptr;
 	std::list<std::function<void()>> deferredUpdates;
+	bool resultsShown = false;
 	bool shutdownRequested = false;
 
 	std::chrono::microseconds backgroundTime;
+
+	void enumerateLevels();
+	void save();
+	void load();
+	void refreshRanks();
 
 	void goToPage(const std::string& page);
 	void createSession(const int level_index);
@@ -1318,12 +1330,9 @@ private:
 Launcher::Launcher(const Settings& _settings, const Storage& _storage, Content& _content, SDL_Window* _window, SDL_Renderer* _renderer, Rml::Context* ui_context)
 	: settings(_settings), storage(_storage), content(_content), window(_window), renderer(_renderer), uiContext(ui_context) {
 
-	levelNames.resize(10);
-	levelRanks.resize(10);
-	for (int i = 0; i < levelNames.size(); ++i) {
-		levelNames.at(i) = i < settings.levels.size() ? settings.levels.at(i).name : "<none>";
-		levelRanks.at(i) = i < settings.levels.size() ? settings.gameplay.ranks.front() : "<none>";
-	}
+	enumerateLevels();
+	load();
+	refreshRanks();
 
 	{
 		Rml::DataModelConstructor launcher_model_ctor = uiContext->CreateDataModel("launcher");
@@ -1338,7 +1347,10 @@ Launcher::Launcher(const Settings& _settings, const Storage& _storage, Content& 
 		launcher_model_ctor.Bind("buildVersion", &buildVersion);
 		launcher_model_ctor.Bind("buildDate", &buildDate);
 		launcher_model_ctor.Bind("levelNames", &levelNames);
-		launcher_model_ctor.Bind("levelRanks", &levelRanks);
+		launcher_model_ctor.Bind("levelScores", &levelScores);
+		launcher_model_ctor.Bind("levelScoreRanks", &levelScoreRanks);
+		launcher_model_ctor.Bind("levelTimes", &levelTimes);
+		launcher_model_ctor.Bind("levelTimeRanks", &levelTimeRanks);
 		launcherModel = launcher_model_ctor.GetModelHandle();
 	}
 
@@ -1351,8 +1363,9 @@ Launcher::Launcher(const Settings& _settings, const Storage& _storage, Content& 
 		session_model_ctor.Bind("speedMultiplier", &speedMultiplier);
 		session_model_ctor.Bind("sequence", &sequence);
 		session_model_ctor.Bind("score", &score);
-		session_model_ctor.Bind("rank", &rank);
+		session_model_ctor.Bind("time", &time);
 		session_model_ctor.Bind("countdown", &countdown);
+		session_model_ctor.Bind("finishedRank", &finishedRank);
 		sessionModel = session_model_ctor.GetModelHandle();
 	}
 
@@ -1365,6 +1378,103 @@ Launcher::~Launcher() {
 	if (document) {
 		uiContext->UnloadDocument(document);
 		document = nullptr;
+	}
+}
+
+void Launcher::enumerateLevels() {
+	constexpr int max_level_count = 10;
+
+	levelNames.clear();
+	levelTargetScores.clear();
+	levelTargetTimes.clear();
+
+	tson::Tileson parser(std::unique_ptr<tson::NlohmannJson>(new tson::NlohmannJson));
+	for (int level_index = 0; level_index < max_level_count; ++level_index) {
+		const std::filesystem::path level_path = fmt::format("levels/level{}.tmj", level_index);
+		if (storage.exists(level_path)) {
+			SDL_IOStream* level_stream = storage.open(level_path);
+			size_t level_data_size = 0;
+			void* level_data = SDL_LoadFile_IO(level_stream, &level_data_size, true);
+			SDL_assert(level_data);
+
+			const std::unique_ptr<tson::Map> level = parser.parse(level_data, level_data_size);
+			SDL_assert(level->getProp("name"));
+			SDL_assert(level->getProp("targetScore"));
+			SDL_assert(level->getProp("targetTime"));
+
+			levelNames.push_back(level->getProp("name")->getValue<std::string>());
+			levelTargetScores.push_back(level->getProp("targetScore")->getValue<float>());
+			levelTargetTimes.push_back(level->getProp("targetTime")->getValue<float>());
+		} else {
+			levelNames.push_back("<none>");
+			levelTargetScores.push_back(FLT_MAX);
+			levelTargetTimes.push_back(FLT_MAX);
+		}
+	}
+}
+
+void Launcher::save() {
+	SDL_Storage* storage = SDL_OpenUserStorage("Cinghy Creations", "Drunken Lobster Driving", 0);
+	SDL_assert(storage);
+	SDL_assert(SDL_StorageReady(storage));
+
+	nlohmann::json json = savegame;
+	const std::string data = json.dump();
+	const bool write_ok = SDL_WriteStorageFile(storage, "savegame.json", data.data(), data.size());
+	SDL_assert(write_ok);
+
+	const bool close_ok = SDL_CloseStorage(storage);
+	SDL_assert(close_ok);
+}
+
+void Launcher::load() {
+	SDL_Storage* storage = SDL_OpenUserStorage("Cinghy Creations", "Drunken Lobster Driving", 0);
+	SDL_assert(storage);
+	SDL_assert(SDL_StorageReady(storage));
+
+	const bool exists = SDL_GetStoragePathInfo(storage, "savegame.json", nullptr);
+	if (exists) {
+		uint64_t filesize = 0;
+		const bool get_size_ok = SDL_GetStorageFileSize(storage, "savegame.json", &filesize);
+		SDL_assert(get_size_ok);
+
+		std::string data;
+		data.resize(filesize);
+		const bool read_ok = SDL_ReadStorageFile(storage, "savegame.json", data.data(), data.size());
+		SDL_assert(read_ok);
+
+		const nlohmann::json json = nlohmann::json::parse(data);
+		savegame = json;
+	} else {
+		savegame = Savegame{};
+	}
+
+	const bool close_ok = SDL_CloseStorage(storage);
+	SDL_assert(close_ok);
+}
+
+void Launcher::refreshRanks() {
+	levelScores.resize(levelNames.size());
+	levelScoreRanks.resize(levelNames.size());
+	levelTimes.resize(levelNames.size());
+	levelTimeRanks.resize(levelNames.size());
+
+	for (int level_index = 0; level_index < levelNames.size(); ++level_index) {
+		if (level_index < savegame.records.size() && savegame.records.at(level_index).score >= 0) {
+			levelScores.at(level_index) = fmt::format("{}", int(savegame.records.at(level_index).score));
+			levelScoreRanks.at(level_index) = Session::getScoreRank(settings, savegame.records.at(level_index).score, levelTargetScores.at(level_index));
+		} else {
+			levelScores.at(level_index) = "---";
+			levelScoreRanks.at(level_index) = "---";
+		}
+
+		if (level_index < savegame.records.size() && savegame.records.at(level_index).time >= 0) {
+			levelTimes.at(level_index) = fmt::format("{:.01f}s", savegame.records.at(level_index).time);
+			levelTimeRanks.at(level_index) = Session::getTimeRank(settings, savegame.records.at(level_index).time, levelTargetTimes.at(level_index));
+		} else {
+			levelTimes.at(level_index) = "---";
+			levelTimeRanks.at(level_index) = "---";
+		}
 	}
 }
 
@@ -1396,13 +1506,34 @@ void Launcher::update(const std::chrono::microseconds real_total_time, const std
 		score = int(session->getScore());
 		sessionModel.DirtyVariable("score");
 
-		rank = session->getRank();
-		sessionModel.DirtyVariable("rank");
+		time = fmt::format("{:.01f}s", session->getSessionTime());
+		sessionModel.DirtyVariable("time");
 
 		countdown = (session->getCountdownTime().count() + 999999) / 1000000;
 		sessionModel.DirtyVariable("countdown");
 
 		if (session->isFinished() && !resultsShown) {
+			if (sessionLevelIndex >= savegame.records.size()) {
+				savegame.records.resize(sessionLevelIndex + 1);
+			}
+
+			if (sessionGameMode == GameMode::Destruction) {
+				if (savegame.records.at(sessionLevelIndex).score < 0 || session->getScore() > savegame.records.at(sessionLevelIndex).score) {
+					savegame.records.at(sessionLevelIndex).score = session->getScore();
+					save();
+					refreshRanks();
+				}
+				finishedRank = Session::getScoreRank(settings, session->getScore(), levelTargetScores.at(sessionLevelIndex));
+			} else if (sessionGameMode == GameMode::TimeAttack) {
+				if (savegame.records.at(sessionLevelIndex).time < 0 || session->getFinishTime() < savegame.records.at(sessionLevelIndex).time) {
+					savegame.records.at(sessionLevelIndex).time = session->getFinishTime();
+					save();
+					refreshRanks();
+				}
+				finishedRank = Session::getTimeRank(settings, session->getFinishTime(), levelTargetTimes.at(sessionLevelIndex));
+			}
+			sessionModel.DirtyVariable("finishedRank");
+
 			resultsShown = true;
 			captureMouse(false);
 			goToPage("ui/results.html");
@@ -1432,12 +1563,17 @@ void Launcher::goToPage(const std::string& page) {
 }
 
 void Launcher::createSession(const int level_index) {
+	const std::filesystem::path level_path = fmt::format("levels/level{}.tmj", level_index);
+
+	sessionGameMode = GameMode::Destruction;
+	sessionLevelIndex = level_index;
 	session.reset();
-	session.reset(new Session(settings, storage, content, window, renderer, level_index));
+	session.reset(new Session(settings, storage, content, window, renderer, level_path));
 	resultsShown = false;
 }
 
 void Launcher::destroySession() {
+	sessionLevelIndex = -1;
 	session.reset();
 	resultsShown = false;
 }
