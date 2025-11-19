@@ -1834,16 +1834,21 @@ SDL_AppResult App::processEvent(SDL_Event* event) {
 
 	if (event->type == SDL_EVENT_QUIT) {
 		return SDL_APP_SUCCESS;
-#ifdef CC_HAS_DEVUI
 	} else if (event->type == SDL_EVENT_WINDOW_DISPLAY_SCALE_CHANGED) {
 		const float main_scale = SDL_GetWindowDisplayScale(window);
 		ImGui::GetStyle().FontScaleDpi = main_scale;
-#endif
-	} else if (event->type == SDL_EVENT_KEY_DOWN && event->key.scancode == SDL_SCANCODE_F1) {
+	}
+#ifdef CC_HAS_DEVUI
+	else if (event->type == SDL_EVENT_KEY_DOWN && event->key.scancode == SDL_SCANCODE_F1) {
 		showDevUi = !showDevUi;
+		if (showDevUi) {
+			const bool mouse_mode_ok = SDL_SetWindowRelativeMouseMode(window, false);
+			SDL_assert(mouse_mode_ok);
+		}
 	} else if (event->type == SDL_EVENT_KEY_DOWN && event->key.scancode == SDL_SCANCODE_F12) {
 		Rml::Debugger::SetVisible(!Rml::Debugger::IsVisible());
 	}
+#endif
 
 	return SDL_APP_CONTINUE;
 }
