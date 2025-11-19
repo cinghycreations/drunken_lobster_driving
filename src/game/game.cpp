@@ -138,14 +138,12 @@ void Storage::saveJson(const std::filesystem::path& path, const nlohmann::json& 
 //////////////
 
 struct ShakeSettings {
-	float durationBase = 0.5f;
-	float durationCoeff = 0.1f;
-	float periodBase = 0.1f;
-	float periodCoeff = 0.1f;
-	float strengthBase = 0.2f;
-	float strengthCoeff = 0.2f;
+	float2 blastRange = {1000, 10000};
+	float2 durationRange = {0.5f, 1.0f};
+	float2 periodRange = {0.1f, 0.2f};
+	float2 strengthRange = {0.2f, 0.2f};
 
-	NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(ShakeSettings, durationBase, durationCoeff, periodBase, periodCoeff, strengthBase, strengthCoeff);
+	NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(ShakeSettings, blastRange, durationRange, periodRange, strengthRange);
 };
 
 struct CameraSettings {
@@ -242,12 +240,10 @@ void Settings::update(const Storage& storage) {
 
 		if (ImGui::CollapsingHeader("Camera", ImGuiTreeNodeFlags_DefaultOpen)) {
 			ImGui::DragFloat("Zoom", &camera.zoom, 0.01f, 0.01f, 10);
-			ImGui::DragFloat("Shake Time Base", &camera.shake.durationBase, 0.01f);
-			ImGui::DragFloat("Shake Time Factor", &camera.shake.durationCoeff, 0.01f);
-			ImGui::DragFloat("Shake Period Base", &camera.shake.periodBase, 0.01f);
-			ImGui::DragFloat("Shake Period Factor", &camera.shake.periodCoeff, 0.01f);
-			ImGui::DragFloat("Shake Strength Base", &camera.shake.strengthBase, 0.01f);
-			ImGui::DragFloat("Shake Strength Factor", &camera.shake.strengthCoeff, 0.01f);
+			ImGui::DragFloat2("Blast Range", &camera.shake.blastRange.x, 0.01f);
+			ImGui::DragFloat2("Duration Range", &camera.shake.durationRange.x, 0.01f);
+			ImGui::DragFloat2("Period Range", &camera.shake.periodRange.x, 0.01f);
+			ImGui::DragFloat2("Strength Range", &camera.shake.strengthRange.x, 0.01f);
 		}
 
 		if (ImGui::CollapsingHeader("Car", ImGuiTreeNodeFlags_DefaultOpen)) {
@@ -702,6 +698,12 @@ void Session::update(const std::chrono::microseconds real_delta_time) {
 			ImGui::BeginDisabled(cameraFollowCar);
 			ImGui::DragFloat2("Position##Camera", &cameraPosition.x, 0.01f);
 			ImGui::EndDisabled();
+			if (ImGui::Button("Try Minimum Shake")) {
+				cameraShaker.shake(settings.camera.shake.durationRange.x, settings.camera.shake.periodRange.x, settings.camera.shake.strengthRange.x);
+			}
+			if (ImGui::Button("Try Maximum Shake")) {
+				cameraShaker.shake(settings.camera.shake.durationRange.y, settings.camera.shake.periodRange.y, settings.camera.shake.strengthRange.y);
+			}
 		}
 
 		if (ImGui::CollapsingHeader("Car", ImGuiTreeNodeFlags_DefaultOpen)) {
@@ -1000,10 +1002,13 @@ void Session::updateCarCollisions(const std::chrono::microseconds total_time) {
 		sequence.push_back(cell.buildingType);
 		sequenceTimeLeft = TimeUtils::floatSecondsToMicroseconds(settings.gameplay.sequenceTime);
 
-		const float blast = Session::scoreSequence(settings, sequence) / 1000;
-		cameraShaker.shake(settings.camera.shake.durationBase + settings.camera.shake.durationCoeff * blast,
-						   settings.camera.shake.periodBase + settings.camera.shake.periodCoeff * blast,
-						   settings.camera.shake.strengthBase + settings.camera.shake.strengthCoeff * blast);
+		const float blast = Session::scoreSequence(settings, sequence);
+		const float blast_in_range =
+			std::clamp<float>((blast - settings.camera.shake.blastRange.x) / (settings.camera.shake.blastRange.y - settings.camera.shake.blastRange.x), 0, 1);
+		const float duration = std::lerp<float>(settings.camera.shake.durationRange.x, settings.camera.shake.durationRange.y, blast_in_range);
+		const float period = std::lerp<float>(settings.camera.shake.periodRange.x, settings.camera.shake.periodRange.y, blast_in_range);
+		const float strength = std::lerp<float>(settings.camera.shake.strengthRange.x, settings.camera.shake.strengthRange.y, blast_in_range);
+		cameraShaker.shake(duration, period, strength);
 	} while (false);
 
 	if (bouncing) {
