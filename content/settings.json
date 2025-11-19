@@ -2,28 +2,19 @@
 	"camera": {
 		"shake": {
 			"durationBase": 0.5,
-			"durationCoeff": 0.10000000149011612,
+			"durationCoeff": 0.009999999776482582,
 			"periodBase": 0.10000000149011612,
 			"periodCoeff": 0.0,
 			"strengthBase": 0.009999999776482582,
-			"strengthCoeff": 0.019999999552965164
+			"strengthCoeff": 0.004999999888241291
 		},
-		"zoom": 0.6000000238418579
+		"zoom": 0.5
 	},
 	"car": {
 		"baseSpeed": 1.5,
-		"blastMultiplierDecrease": 0.75,
-		"blastMultiplierRange": {
-			"x": 1.0,
-			"y": 5.0
-		},
-		"blastMultiplierStackedRange": {
-			"x": 1.0,
-			"y": 6.0
-		},
 		"grip": 0.4000000059604645,
 		"mouseSensibility": 0.007499999832361937,
-		"size": 0.30000001192092896,
+		"size": 0.4000000059604645,
 		"speedMultiplierDecrease": 1.0,
 		"speedMultiplierRange": {
 			"x": 1.0,
@@ -35,61 +26,33 @@
 		}
 	},
 	"gameplay": {
-		"blastCategories": [
+		"fiveInARowScore": 3000.0,
+		"garden": {
+			"speedMultiplierBonus": 3.0
+		},
+		"gaspump": {
+			"speedMultiplierBonus": 3.0
+		},
+		"house": {
+			"speedMultiplierBonus": 3.0
+		},
+		"nuclear": {
+			"speedMultiplierBonus": 3.0
+		},
+		"nuclearScoreMultiplier": 5.0,
+		"ranks": [
 			"Lame Lobster",
 			"Annoying Lobster",
 			"Infamous Lobster",
 			"Terrorist Lobster",
 			"Worst Lobster Ever"
 		],
-		"garden": {
-			"baseBlast": 0.10000000149011612,
-			"blastMultiplierBonus": 0.0,
-			"speedMultiplierBonus": 3.0
-		},
-		"gaspump": {
-			"baseBlast": 0.10000000149011612,
-			"blastMultiplierBonus": 0.0,
-			"speedMultiplierBonus": 3.0
-		},
-		"house": {
-			"baseBlast": 0.10000000149011612,
-			"blastMultiplierBonus": 1.0,
-			"speedMultiplierBonus": 3.0
-		},
-		"nuclear": {
-			"baseBlast": 0.5,
-			"blastMultiplierBonus": 0.0,
-			"speedMultiplierBonus": 3.0
-		},
+		"sequenceTime": 2.0,
 		"skyscraper": {
-			"baseBlast": 0.25,
-			"blastMultiplierBonus": 3.0,
 			"speedMultiplierBonus": 3.0
-		}
-	},
-	"levels": [
-		{
-			"blastCategoryThresholds": [
-				0.0,
-				0.10000000149011612,
-				0.20000000298023224,
-				1.0,
-				1.5
-			],
-			"name": "Countryside",
-			"path": "levels/level0.tmj"
 		},
-		{
-			"blastCategoryThresholds": [
-				0.0,
-				1.0,
-				2.0,
-				3.0,
-				4.0
-			],
-			"name": "Smalltown",
-			"path": "levels/level1.tmj"
-		}
-	]
+		"skyscraperScoreMultiplier": 2.0,
+		"threeDifferentScore": 3000.0,
+		"threeInARowScore": 1000.0
+	}
 }
