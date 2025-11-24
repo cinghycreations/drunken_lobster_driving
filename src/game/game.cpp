@@ -1367,7 +1367,7 @@ Launcher::~Launcher() {
 }
 
 void Launcher::enumerateLevels() {
-	constexpr int max_level_count = 10;
+	constexpr int max_level_count = 8;
 
 	levelNames.clear();
 	levelTargetScores.clear();
