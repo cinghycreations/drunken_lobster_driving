@@ -1005,9 +1005,9 @@ void Session::updateCarCollisions(const std::chrono::microseconds total_time) {
 		const float blast = Session::scoreSequence(settings, sequence);
 		const float blast_in_range =
 			std::clamp<float>((blast - settings.camera.shake.blastRange.x) / (settings.camera.shake.blastRange.y - settings.camera.shake.blastRange.x), 0, 1);
-		const float duration = std::lerp<float>(settings.camera.shake.durationRange.x, settings.camera.shake.durationRange.y, blast_in_range);
-		const float period = std::lerp<float>(settings.camera.shake.periodRange.x, settings.camera.shake.periodRange.y, blast_in_range);
-		const float strength = std::lerp<float>(settings.camera.shake.strengthRange.x, settings.camera.shake.strengthRange.y, blast_in_range);
+		const float duration = glm::lerp<float>(settings.camera.shake.durationRange.x, settings.camera.shake.durationRange.y, blast_in_range);
+		const float period = glm::lerp<float>(settings.camera.shake.periodRange.x, settings.camera.shake.periodRange.y, blast_in_range);
+		const float strength = glm::lerp<float>(settings.camera.shake.strengthRange.x, settings.camera.shake.strengthRange.y, blast_in_range);
 		cameraShaker.shake(duration, period, strength);
 	} while (false);
 
@@ -1839,12 +1839,12 @@ SDL_AppResult App::processEvent(SDL_Event* event) {
 
 	if (event->type == SDL_EVENT_QUIT) {
 		return SDL_APP_SUCCESS;
-	} else if (event->type == SDL_EVENT_WINDOW_DISPLAY_SCALE_CHANGED) {
-		const float main_scale = SDL_GetWindowDisplayScale(window);
-		ImGui::GetStyle().FontScaleDpi = main_scale;
 	}
 #ifdef CC_HAS_DEVUI
-	else if (event->type == SDL_EVENT_KEY_DOWN && event->key.scancode == SDL_SCANCODE_F1) {
+	else if (event->type == SDL_EVENT_WINDOW_DISPLAY_SCALE_CHANGED) {
+		const float main_scale = SDL_GetWindowDisplayScale(window);
+		ImGui::GetStyle().FontScaleDpi = main_scale;
+	} else if (event->type == SDL_EVENT_KEY_DOWN && event->key.scancode == SDL_SCANCODE_F1) {
 		showDevUi = !showDevUi;
 		if (showDevUi) {
 			const bool mouse_mode_ok = SDL_SetWindowRelativeMouseMode(window, false);
