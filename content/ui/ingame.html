@@ -50,6 +50,7 @@
 <body data-model="session">
     <header>
         <panel>
+            <p data-if="currentMode == 'Sequence'">Sequence {{sequence}}</p>
             <p data-if="currentMode == 'Sequence'">Score {{score}}</p>
             <p data-if="currentMode == 'Time Attack'">Time {{time}}</p>
         </panel>
