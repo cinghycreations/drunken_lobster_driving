@@ -1258,10 +1258,10 @@ private:
 	std::string buildVersion = "v0";
 	std::string buildDate = __DATE__ " " __TIME__;
 	std::vector<Rml::String> levelNames;
-	std::vector<Rml::String> levelScores;
-	std::vector<Rml::String> levelScoreRanks;
-	std::vector<Rml::String> levelTimes;
-	std::vector<Rml::String> levelTimeRanks;
+	std::vector<Rml::String> levelRecords;
+	std::vector<Rml::String> levelRanks;
+	std::string currentMode;
+
 	std::string speedMultiplier;
 	std::string sequence;
 	int score;
@@ -1274,7 +1274,7 @@ private:
 	Savegame savegame;
 
 	std::unique_ptr<Session> session;
-	GameMode sessionGameMode = GameMode::Destruction;
+	GameMode sessionGameMode;
 	int sessionLevelIndex = -1;
 
 	Rml::ElementDocument* document = nullptr;
@@ -1287,7 +1287,7 @@ private:
 	void enumerateLevels();
 	void save();
 	void load();
-	void refreshRanks();
+	void refreshGameMode(const GameMode game_mode);
 
 	void goToPage(const std::string& page);
 	void createSession(const int level_index);
@@ -1301,6 +1301,7 @@ private:
 	void quit(Rml::DataModelHandle handle, Rml::Event& event, const Rml::VariantList& params);
 
 	void playLevel(Rml::DataModelHandle handle, Rml::Event& event, const Rml::VariantList& params);
+	void switchMode(Rml::DataModelHandle handle, Rml::Event& event, const Rml::VariantList& params);
 	void pauseSession(Rml::DataModelHandle handle, Rml::Event& event, const Rml::VariantList& params);
 	void resumeSession(Rml::DataModelHandle handle, Rml::Event& event, const Rml::VariantList& params);
 	void restartSession(Rml::DataModelHandle handle, Rml::Event& event, const Rml::VariantList& params);
@@ -1315,10 +1316,6 @@ private:
 Launcher::Launcher(const Settings& _settings, const Storage& _storage, Content& _content, SDL_Window* _window, SDL_Renderer* _renderer, Rml::Context* ui_context)
 	: settings(_settings), storage(_storage), content(_content), window(_window), renderer(_renderer), uiContext(ui_context) {
 
-	enumerateLevels();
-	load();
-	refreshRanks();
-
 	{
 		Rml::DataModelConstructor launcher_model_ctor = uiContext->CreateDataModel("launcher");
 		launcher_model_ctor.RegisterArray<std::vector<Rml::String>>();
@@ -1329,13 +1326,13 @@ Launcher::Launcher(const Settings& _settings, const Storage& _storage, Content& 
 		launcher_model_ctor.BindEventCallback("goToHome", &Launcher::goToHome, this);
 		launcher_model_ctor.BindEventCallback("quit", &Launcher::quit, this);
 		launcher_model_ctor.BindEventCallback("playLevel", &Launcher::playLevel, this);
+		launcher_model_ctor.BindEventCallback("switchMode", &Launcher::switchMode, this);
 		launcher_model_ctor.Bind("buildVersion", &buildVersion);
 		launcher_model_ctor.Bind("buildDate", &buildDate);
 		launcher_model_ctor.Bind("levelNames", &levelNames);
-		launcher_model_ctor.Bind("levelScores", &levelScores);
-		launcher_model_ctor.Bind("levelScoreRanks", &levelScoreRanks);
-		launcher_model_ctor.Bind("levelTimes", &levelTimes);
-		launcher_model_ctor.Bind("levelTimeRanks", &levelTimeRanks);
+		launcher_model_ctor.Bind("levelRecords", &levelRecords);
+		launcher_model_ctor.Bind("levelRanks", &levelRanks);
+		launcher_model_ctor.Bind("currentMode", &currentMode);
 		launcherModel = launcher_model_ctor.GetModelHandle();
 	}
 
@@ -1353,6 +1350,10 @@ Launcher::Launcher(const Settings& _settings, const Storage& _storage, Content& 
 		session_model_ctor.Bind("finishedRank", &finishedRank);
 		sessionModel = session_model_ctor.GetModelHandle();
 	}
+
+	enumerateLevels();
+	load();
+	refreshGameMode(GameMode::Destruction);
 
 	document = uiContext->LoadDocument("ui/home.html");
 	SDL_assert(document);
@@ -1438,29 +1439,41 @@ void Launcher::load() {
 	SDL_assert(close_ok);
 }
 
-void Launcher::refreshRanks() {
-	levelScores.resize(levelNames.size());
-	levelScoreRanks.resize(levelNames.size());
-	levelTimes.resize(levelNames.size());
-	levelTimeRanks.resize(levelNames.size());
+void Launcher::refreshGameMode(const GameMode game_mode) {
+	sessionGameMode = game_mode;
+	levelRecords.resize(levelNames.size());
+	levelRanks.resize(levelNames.size());
 
-	for (int level_index = 0; level_index < levelNames.size(); ++level_index) {
-		if (level_index < savegame.records.size() && savegame.records.at(level_index).score >= 0) {
-			levelScores.at(level_index) = fmt::format("{}", int(savegame.records.at(level_index).score));
-			levelScoreRanks.at(level_index) = Session::getScoreRank(settings, savegame.records.at(level_index).score, levelTargetScores.at(level_index));
-		} else {
-			levelScores.at(level_index) = "---";
-			levelScoreRanks.at(level_index) = "---";
+	SDL_assert(sessionGameMode == GameMode::Destruction || sessionGameMode == GameMode::TimeAttack);
+	if (sessionGameMode == GameMode::Destruction) {
+		currentMode = "Sequence";
+
+		for (int level_index = 0; level_index < levelNames.size(); ++level_index) {
+			if (level_index < savegame.records.size() && savegame.records.at(level_index).score >= 0) {
+				levelRecords.at(level_index) = fmt::format("{}", int(savegame.records.at(level_index).score));
+				levelRanks.at(level_index) = Session::getScoreRank(settings, savegame.records.at(level_index).score, levelTargetScores.at(level_index));
+			} else {
+				levelRecords.at(level_index) = "---";
+				levelRanks.at(level_index) = "---";
+			}
 		}
+	} else if (sessionGameMode == GameMode::TimeAttack) {
+		currentMode = "Time Attack";
 
-		if (level_index < savegame.records.size() && savegame.records.at(level_index).time >= 0) {
-			levelTimes.at(level_index) = fmt::format("{:.01f}s", savegame.records.at(level_index).time);
-			levelTimeRanks.at(level_index) = Session::getTimeRank(settings, savegame.records.at(level_index).time, levelTargetTimes.at(level_index));
-		} else {
-			levelTimes.at(level_index) = "---";
-			levelTimeRanks.at(level_index) = "---";
+		for (int level_index = 0; level_index < levelNames.size(); ++level_index) {
+			if (level_index < savegame.records.size() && savegame.records.at(level_index).time >= 0) {
+				levelRecords.at(level_index) = fmt::format("{:.01f}s", savegame.records.at(level_index).time);
+				levelRanks.at(level_index) = Session::getTimeRank(settings, savegame.records.at(level_index).time, levelTargetTimes.at(level_index));
+			} else {
+				levelRecords.at(level_index) = "---";
+				levelRanks.at(level_index) = "---";
+			}
 		}
 	}
+
+	launcherModel.DirtyVariable("currentMode");
+	launcherModel.DirtyVariable("levelRecords");
+	launcherModel.DirtyVariable("levelRanks");
 }
 
 void Launcher::update(const std::chrono::microseconds real_total_time, const std::chrono::microseconds real_delta_time) {
@@ -1506,14 +1519,14 @@ void Launcher::update(const std::chrono::microseconds real_total_time, const std
 				if (savegame.records.at(sessionLevelIndex).score < 0 || session->getScore() > savegame.records.at(sessionLevelIndex).score) {
 					savegame.records.at(sessionLevelIndex).score = session->getScore();
 					save();
-					refreshRanks();
+					refreshGameMode(GameMode::Destruction);
 				}
 				finishedRank = Session::getScoreRank(settings, session->getScore(), levelTargetScores.at(sessionLevelIndex));
 			} else if (sessionGameMode == GameMode::TimeAttack) {
 				if (savegame.records.at(sessionLevelIndex).time < 0 || session->getFinishTime() < savegame.records.at(sessionLevelIndex).time) {
 					savegame.records.at(sessionLevelIndex).time = session->getFinishTime();
 					save();
-					refreshRanks();
+					refreshGameMode(GameMode::TimeAttack);
 				}
 				finishedRank = Session::getTimeRank(settings, session->getFinishTime(), levelTargetTimes.at(sessionLevelIndex));
 			}
@@ -1550,7 +1563,6 @@ void Launcher::goToPage(const std::string& page) {
 void Launcher::createSession(const int level_index) {
 	const std::filesystem::path level_path = fmt::format("levels/level{}.tmj", level_index);
 
-	sessionGameMode = GameMode::Destruction;
 	sessionLevelIndex = level_index;
 	session.reset();
 	session.reset(new Session(settings, storage, content, window, renderer, level_path));
@@ -1603,6 +1615,15 @@ void Launcher::playLevel(Rml::DataModelHandle handle, Rml::Event& event, const R
 		captureMouse(true);
 		goToPage("ui/ingame.html");
 	});
+}
+
+void Launcher::switchMode(Rml::DataModelHandle handle, Rml::Event& event, const Rml::VariantList& params) {
+	SDL_assert(sessionGameMode == GameMode::Destruction || sessionGameMode == GameMode::TimeAttack);
+	if (sessionGameMode == GameMode::Destruction) {
+		refreshGameMode(GameMode::TimeAttack);
+	} else if (sessionGameMode == GameMode::TimeAttack) {
+		refreshGameMode(GameMode::Destruction);
+	}
 }
 
 void Launcher::pauseSession(Rml::DataModelHandle handle, Rml::Event& event, const Rml::VariantList& params) {
