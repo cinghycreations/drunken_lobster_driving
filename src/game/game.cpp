@@ -1348,6 +1348,7 @@ Launcher::Launcher(const Settings& _settings, const Storage& _storage, Content& 
 		session_model_ctor.Bind("time", &time);
 		session_model_ctor.Bind("countdown", &countdown);
 		session_model_ctor.Bind("finishedRank", &finishedRank);
+		session_model_ctor.Bind("currentMode", &currentMode);
 		sessionModel = session_model_ctor.GetModelHandle();
 	}
 
@@ -1474,6 +1475,7 @@ void Launcher::refreshGameMode(const GameMode game_mode) {
 	launcherModel.DirtyVariable("currentMode");
 	launcherModel.DirtyVariable("levelRecords");
 	launcherModel.DirtyVariable("levelRanks");
+	sessionModel.DirtyVariable("currentMode");
 }
 
 void Launcher::update(const std::chrono::microseconds real_total_time, const std::chrono::microseconds real_delta_time) {
