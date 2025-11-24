@@ -187,9 +187,7 @@ struct BuildingSettings {
 struct GameplaySettings {
 	std::array<std::string, 5> ranks = {"Lame Lobster", "Annoying Lobster", "Infamous Lobster", "Terrorist Lobster", "Worst Lobster Ever"};
 	float sequenceTime = 2.0f;
-	float threeInARowScore = 1000;
-	float fiveInARowScore = 3000;
-	float threeDifferentScore = 3000;
+	float sequenceScoreExponent = 1.5f;
 	float skyscraperScoreMultiplier = 2;
 	float nuclearScoreMultiplier = 5;
 	BuildingSettings garden;
@@ -198,8 +196,8 @@ struct GameplaySettings {
 	BuildingSettings skyscraper;
 	BuildingSettings nuclear;
 
-	NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(GameplaySettings, sequenceTime, threeInARowScore, fiveInARowScore, threeDifferentScore, skyscraperScoreMultiplier,
-												nuclearScoreMultiplier, ranks, garden, house, gaspump, skyscraper, nuclear);
+	NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(GameplaySettings, sequenceTime, sequenceScoreExponent, skyscraperScoreMultiplier, nuclearScoreMultiplier, ranks, garden, house,
+												gaspump, skyscraper, nuclear);
 };
 
 struct Settings {
@@ -264,9 +262,7 @@ void Settings::update(const Storage& storage) {
 			ImGui::Separator();
 
 			ImGui::DragFloat("Sequence Time", &gameplay.sequenceTime, 0.01f);
-			ImGui::DragFloat("Three In A Row Score", &gameplay.threeInARowScore, 0.01f);
-			ImGui::DragFloat("Five In A Row Score", &gameplay.fiveInARowScore, 0.01f);
-			ImGui::DragFloat("Three Different Score", &gameplay.threeDifferentScore, 0.01f);
+			ImGui::DragFloat("Sequence Score Exponent", &gameplay.sequenceScoreExponent, 0.01f);
 			ImGui::DragFloat("Skyscraper Score Multiplier", &gameplay.skyscraperScoreMultiplier, 0.01f);
 			ImGui::DragFloat("Nuclear Score Multiplier", &gameplay.nuclearScoreMultiplier, 0.01f);
 			ImGui::Separator();
@@ -804,21 +800,11 @@ float Session::scoreSequence(const Settings& settings, const std::vector<Buildin
 	}
 
 	while (i < sequence.size()) {
-		const bool five_in_a_row = i + 4 < sequence.size() && sequence.at(i) == sequence.at(i + 1) && sequence.at(i) == sequence.at(i + 2) &&
-								   sequence.at(i) == sequence.at(i + 3) && sequence.at(i) == sequence.at(i + 4) && sequence.at(i) != BuildingType::Skyscraper &&
-								   sequence.at(i) != BuildingType::Nuclear && sequence.at(i + 1) != BuildingType::Skyscraper && sequence.at(i + 1) != BuildingType::Nuclear &&
-								   sequence.at(i + 2) != BuildingType::Skyscraper && sequence.at(i + 2) != BuildingType::Nuclear &&
-								   sequence.at(i + 3) != BuildingType::Skyscraper && sequence.at(i + 3) != BuildingType::Nuclear &&
-								   sequence.at(i + 4) != BuildingType::Skyscraper && sequence.at(i + 4) != BuildingType::Nuclear;
-
-		const bool three_in_a_row = i + 2 < sequence.size() && sequence.at(i) == sequence.at(i + 1) && sequence.at(i) == sequence.at(i + 2) &&
-									sequence.at(i) != BuildingType::Skyscraper && sequence.at(i) != BuildingType::Nuclear && sequence.at(i + 1) != BuildingType::Skyscraper &&
-									sequence.at(i + 1) != BuildingType::Nuclear && sequence.at(i + 2) != BuildingType::Skyscraper && sequence.at(i + 2) != BuildingType::Nuclear;
-
-		const bool three_different = i + 2 < sequence.size() && sequence.at(i) != sequence.at(i + 1) && sequence.at(i) != sequence.at(i + 2) &&
-									 sequence.at(i + 1) != sequence.at(i + 2) && sequence.at(i) != BuildingType::Skyscraper && sequence.at(i) != BuildingType::Nuclear &&
-									 sequence.at(i + 1) != BuildingType::Skyscraper && sequence.at(i + 1) != BuildingType::Nuclear &&
-									 sequence.at(i + 2) != BuildingType::Skyscraper && sequence.at(i + 2) != BuildingType::Nuclear;
+		int sequence_len = 1;
+		while (i + sequence_len < sequence.size() && sequence.at(i + sequence_len) != BuildingType::Skyscraper && sequence.at(i + sequence_len) != BuildingType::Nuclear &&
+			   sequence.at(i + sequence_len) == sequence.at(i)) {
+			++sequence_len;
+		}
 
 		if (sequence.at(i) == BuildingType::Skyscraper) {
 			mult *= settings.gameplay.skyscraperScoreMultiplier;
@@ -826,15 +812,9 @@ float Session::scoreSequence(const Settings& settings, const std::vector<Buildin
 		} else if (sequence.at(i) == BuildingType::Nuclear) {
 			mult *= settings.gameplay.nuclearScoreMultiplier;
 			i += 1;
-		} else if (five_in_a_row) {
-			base += settings.gameplay.fiveInARowScore;
-			i += 5;
-		} else if (three_in_a_row) {
-			base += settings.gameplay.threeInARowScore;
-			i += 3;
-		} else if (three_different) {
-			base += settings.gameplay.threeDifferentScore;
-			i += 3;
+		} else if (sequence_len > 1) {
+			base += int(std::pow(float(sequence_len), settings.gameplay.sequenceScoreExponent) * 10);
+			i += sequence_len;
 		} else {
 			i += 1;
 		}
