@@ -1,12 +1,22 @@
 {
 	"camera": {
 		"shake": {
-			"durationBase": 0.5,
-			"durationCoeff": 0.009999999776482582,
-			"periodBase": 0.10000000149011612,
-			"periodCoeff": 0.0,
-			"strengthBase": 0.009999999776482582,
-			"strengthCoeff": 0.004999999888241291
+			"blastRange": {
+				"x": 0.0,
+				"y": 2000.0
+			},
+			"durationRange": {
+				"x": 0.20000000298023224,
+				"y": 0.4000000059604645
+			},
+			"periodRange": {
+				"x": 0.05999999865889549,
+				"y": 0.05999999865889549
+			},
+			"strengthRange": {
+				"x": 0.019999999552965164,
+				"y": 0.05000000074505806
+			}
 		},
 		"zoom": 0.5
 	},
@@ -26,7 +36,6 @@
 		}
 	},
 	"gameplay": {
-		"fiveInARowScore": 3000.0,
 		"garden": {
 			"speedMultiplierBonus": 3.0
 		},
@@ -47,12 +56,11 @@
 			"Terrorist Lobster",
 			"Worst Lobster Ever"
 		],
-		"sequenceTime": 2.0,
+		"sequenceScoreExponent": 1.5,
+		"sequenceTime": 2.0999999046325684,
 		"skyscraper": {
 			"speedMultiplierBonus": 3.0
 		},
-		"skyscraperScoreMultiplier": 2.0,
-		"threeDifferentScore": 3000.0,
-		"threeInARowScore": 1000.0
+		"skyscraperScoreMultiplier": 2.0
 	}
 }
