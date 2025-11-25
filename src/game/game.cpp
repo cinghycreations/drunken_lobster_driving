@@ -1011,6 +1011,8 @@ void Session::updateCarCollisions(const std::chrono::microseconds total_time) {
 			carPosition = float2(carPosition.x, curr_tile.y);
 			carForwardDirection = glm::reflect(carForwardDirection, float2(0, -1));
 		}
+
+		carStats.speedStackedMultiplier = 0;
 	}
 }
 
