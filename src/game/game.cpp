@@ -208,7 +208,7 @@ struct Settings {
 
 	void update(const Storage& storage);
 
-	NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(Settings, camera, car, gameplay);
+	NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(Settings, render, camera, car, gameplay);
 };
 
 void Settings::update(const Storage& storage) {
