@@ -300,9 +300,10 @@ struct LevelRecord {
 };
 
 struct Savegame {
+	int version = 0;
 	std::vector<LevelRecord> records;
 
-	NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(Savegame, records);
+	NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(Savegame, version, records);
 };
 
 /////////////
@@ -1248,6 +1249,8 @@ private:
 		TimeAttack,
 	};
 
+	static constexpr int expectedSavegameVersion = 1;
+
 	const Settings& settings;
 	const Storage& storage;
 	Content& content;
@@ -1273,7 +1276,7 @@ private:
 
 	std::vector<float> levelTargetScores;
 	std::vector<float> levelTargetTimes;
-	Savegame savegame;
+	Savegame savegame = Savegame{.version = expectedSavegameVersion};
 
 	std::unique_ptr<Session> session;
 	GameMode sessionGameMode;
@@ -1433,7 +1436,10 @@ void Launcher::load() {
 		SDL_assert(read_ok);
 
 		const nlohmann::json json = nlohmann::json::parse(data);
-		savegame = json;
+		const Savegame loaded_savegame = json;
+		if (loaded_savegame.version == expectedSavegameVersion) {
+			savegame = loaded_savegame;
+		}
 	} else {
 		savegame = Savegame{};
 	}
