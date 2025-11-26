@@ -40,6 +40,8 @@
     <main>
         <panel>
             <p>Finished!</p>
+            <p data-if="currentMode == 'Sequence'">Score {{score}}</p>
+            <p data-if="currentMode == 'Time Attack'">Time {{time}}</p>
             <p>{{finishedRank}}</p>
             <button data-event-click="restartSession()">Restart</button>
             <button data-event-click="exitSession()">Exit</button>

@@ -449,8 +449,8 @@ public:
 		return finishTime.has_value();
 	}
 
-	float getSessionTime() const {
-		return TimeUtils::microsecondsToFloatSeconds(sessionTotalTime);
+	float getGameTime() const {
+		return TimeUtils::microsecondsToFloatSeconds(finishTime.has_value() ? *finishTime : sessionTotalTime);
 	}
 
 	float getFinishTime() const {
@@ -1514,7 +1514,7 @@ void Launcher::update(const std::chrono::microseconds real_total_time, const std
 		score = int(session->getScore());
 		sessionModel.DirtyVariable("score");
 
-		time = fmt::format("{:.01f}s", session->getSessionTime());
+		time = fmt::format("{:.01f}s", session->getGameTime());
 		sessionModel.DirtyVariable("time");
 
 		countdown = (session->getCountdownTime().count() + 999999) / 1000000;
