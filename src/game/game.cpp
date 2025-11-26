@@ -1758,6 +1758,9 @@ private:
 };
 
 App::App(int argc, char* argv[]) {
+	const bool hint_ok = SDL_SetHint(SDL_HINT_ORIENTATIONS, "LandscapeLeft LandscapeRight");
+	SDL_assert(hint_ok);
+
 	bool init_ok = SDL_Init(SDL_INIT_EVENTS | SDL_INIT_VIDEO);
 	SDL_assert(init_ok);
 
