@@ -25,7 +25,7 @@
             align-items: center;
         }
 
-        main >p{
+        main>p {
             font-size: 6rem;
         }
 
@@ -44,14 +44,25 @@
             margin-top: 0.25rem;
             margin-bottom: 0.25rem;
         }
+
+        .sequence {
+            height: 2rem;
+        }
+
+        .sequence img {
+            width: 2rem;
+            height: 2rem;
+            margin: 0rem;
+            padding: 0rem;
+        }
     </style>
 </head>
 
 <body data-model="session">
     <header>
         <panel>
-            <p data-if="currentMode == 'Sequence'">Sequence {{sequence}}</p>
             <p data-if="currentMode == 'Sequence'">Score {{score}}</p>
+            <p class="sequence" data-if="currentMode == 'Sequence'" data-rml="sequence"></p>
             <p data-if="currentMode == 'Time Attack'">Time {{time}}</p>
         </panel>
     </header>

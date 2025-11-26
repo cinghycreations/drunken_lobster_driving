@@ -1707,31 +1707,30 @@ void Launcher::captureMouse(const bool capture) {
 }
 
 std::string Launcher::renderSequence(const std::vector<Session::BuildingType>& sequence) {
-	std::string result;
-	result.reserve(sequence.size());
+	std::stringstream stream;
 
 	for (const Session::BuildingType& building : sequence) {
 		SDL_assert(building != Session::BuildingType::None && building != Session::BuildingType::Impassable);
 		switch (building) {
 		case Session::BuildingType::Garden:
-			result.push_back('G');
+			stream << "<img src=\"/buildings/garden0000.png\"/>";
 			break;
 		case Session::BuildingType::House:
-			result.push_back('H');
+			stream << "<img src=\"/buildings/house0000.png\"/>";
 			break;
 		case Session::BuildingType::GasPump:
-			result.push_back('P');
+			stream << "<img src=\"/buildings/gaspump0000.png\"/>";
 			break;
 		case Session::BuildingType::Skyscraper:
-			result.push_back('S');
+			stream << "<img src=\"/buildings/skyscraper0000.png\"/>";
 			break;
 		case Session::BuildingType::Nuclear:
-			result.push_back('N');
+			stream << "<img src=\"/buildings/nuclear0000.png\"/>";
 			break;
 		}
 	}
 
-	return result;
+	return stream.str();
 }
 
 /////////
