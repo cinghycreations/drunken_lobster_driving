@@ -37,26 +37,27 @@
             }
         },
         {
-            "name": "html5-dev",
+            "name": "emscripten-dev",
             "generator": "Ninja Multi-Config",
             "binaryDir": "${sourceDir}/temp/build/${presetName}",
             "installDir": "${sourceDir}/temp/install/${presetName}",
-            "toolchainFile": "D:/emsdk/upstream/emscripten/cmake/Modules/Platform/Emscripten.cmake",
+            "toolchainFile": "$env{EMSDK_HOME}/upstream/emscripten/cmake/Modules/Platform/Emscripten.cmake",
             "cacheVariables": {
-                "CMAKE_EXE_LINKER_FLAGS": "--shell-file D:/emsdk/upstream/emscripten/src/shell_minimal.html",
+                "CC_HAS_EMBED_CONTENT": "ON",
+                "CMAKE_EXE_LINKER_FLAGS": "--shell-file $env{EMSDK_HOME}/upstream/emscripten/src/shell_minimal.html",
                 "CMAKE_EXECUTABLE_SUFFIX_CXX": ".html"
             }
         },
         {
-            "name": "html5-release",
+            "name": "emscripten-release",
             "generator": "Ninja Multi-Config",
             "binaryDir": "${sourceDir}/temp/build/${presetName}",
             "installDir": "${sourceDir}/temp/install/${presetName}",
-            "toolchainFile": "D:/emsdk/upstream/emscripten/cmake/Modules/Platform/Emscripten.cmake",
+            "toolchainFile": "$env{EMSDK_HOME}/upstream/emscripten/cmake/Modules/Platform/Emscripten.cmake",
             "cacheVariables": {
                 "CC_HAS_DEVUI": "OFF",
                 "CC_HAS_EMBED_CONTENT": "ON",
-                "CMAKE_EXE_LINKER_FLAGS": "--shell-file D:/emsdk/upstream/emscripten/src/shell_minimal.html",
+                "CMAKE_EXE_LINKER_FLAGS": "--shell-file $env{EMSDK_HOME}/upstream/emscripten/src/shell_minimal.html",
                 "CMAKE_EXECUTABLE_SUFFIX_CXX": ".html"
             }
         },
@@ -108,13 +109,13 @@
             "configuration": "Release"
         },
         {
-            "name": "html5-dev",
-            "configurePreset": "html5-dev",
+            "name": "emscripten-dev",
+            "configurePreset": "emscripten-dev",
             "configuration": "Debug"
         },
         {
-            "name": "html5-release",
-            "configurePreset": "html5-release",
+            "name": "emscripten-release",
+            "configurePreset": "emscripten-release",
             "configuration": "Release"
         },
         {
@@ -182,28 +183,28 @@
             ]
         },
         {
-            "name": "html5-dev",
+            "name": "emscripten-dev",
             "steps": [
                 {
                     "type": "configure",
-                    "name": "html5-dev"
+                    "name": "emscripten-dev"
                 },
                 {
                     "type": "build",
-                    "name": "html5-dev"
+                    "name": "emscripten-dev"
                 }
             ]
         },
         {
-            "name": "html5-release",
+            "name": "emscripten-release",
             "steps": [
                 {
                     "type": "configure",
-                    "name": "html5-release"
+                    "name": "emscripten-release"
                 },
                 {
                     "type": "build",
-                    "name": "html5-release"
+                    "name": "emscripten-release"
                 }
             ]
         },
