@@ -1321,6 +1321,8 @@ private:
 Launcher::Launcher(const Settings& _settings, const Storage& _storage, Content& _content, SDL_Window* _window, SDL_Renderer* _renderer, Rml::Context* ui_context)
 	: settings(_settings), storage(_storage), content(_content), window(_window), renderer(_renderer), uiContext(ui_context) {
 
+	buildVersion = fmt::format("version {}+{}-{}.{:.8}.{}", CC_BUILD_VERSION, CC_BUILD_PLATFORM, CC_BUILD_CONFIG, CC_BUILD_COMMIT, CC_BUILD_NUMBER);
+
 	{
 		Rml::DataModelConstructor launcher_model_ctor = uiContext->CreateDataModel("launcher");
 		launcher_model_ctor.RegisterArray<std::vector<Rml::String>>();
