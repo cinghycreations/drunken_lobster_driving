@@ -4,7 +4,7 @@ jobs:
   build:
     strategy:
       matrix:
-        platform: [windows, android]
+        platform: [windows, emscripten]
         config: [dev, release]
     name: ${{matrix.platform}}-${{matrix.config}}
     runs-on: [ self-hosted, "${{matrix.platform}}" ]
