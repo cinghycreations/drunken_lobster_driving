@@ -532,7 +532,7 @@ private:
 	static std::string debugRenderSequence(const std::vector<Session::BuildingType>& sequence);
 
 	void updateCarStats(const std::chrono::microseconds delta_time);
-	void updateCarDrive(const std::chrono::microseconds delta_time);
+	void updateCarDrive(const std::chrono::microseconds delta_time, const float mouse_delta_x);
 	void updateCarCollisions(const std::chrono::microseconds total_time);
 	bool isGameFinished() const;
 
@@ -729,24 +729,28 @@ void Session::update(const std::chrono::microseconds real_delta_time) {
 #endif
 
 	//---------- Car ----------//
+	{
+		float mouse_delta_x;
+		SDL_GetRelativeMouseState(&mouse_delta_x, nullptr);
 
-	if (!paused) {
-		if (debug_simulation) {
-			SDL_TriggerBreakpoint();
-		}
+		if (!paused) {
+			if (debug_simulation) {
+				SDL_TriggerBreakpoint();
+			}
 
-		if (real_delta_time >= countdownTime) {
-			countdownTime = std::chrono::microseconds(0);
-		} else {
-			countdownTime -= real_delta_time;
-		}
+			if (real_delta_time >= countdownTime) {
+				countdownTime = std::chrono::microseconds(0);
+			} else {
+				countdownTime -= real_delta_time;
+			}
 
-		if (countdownTime.count() == 0) {
-			sessionTotalTime += real_delta_time;
-			updateCarStats(real_delta_time);
-			updateCarDrive(real_delta_time);
-			updateCarCollisions(sessionTotalTime);
-			cameraShaker.update(real_delta_time);
+			if (countdownTime.count() == 0) {
+				sessionTotalTime += real_delta_time;
+				updateCarStats(real_delta_time);
+				updateCarDrive(real_delta_time, mouse_delta_x);
+				updateCarCollisions(sessionTotalTime);
+				cameraShaker.update(real_delta_time);
+			}
 		}
 	}
 
@@ -870,11 +874,8 @@ void Session::updateCarStats(const std::chrono::microseconds delta_time) {
 	}
 }
 
-void Session::updateCarDrive(const std::chrono::microseconds delta_time) {
+void Session::updateCarDrive(const std::chrono::microseconds delta_time, const float mouse_delta_x) {
 	carPrevPosition = carPosition;
-
-	float mouse_delta_x;
-	SDL_GetRelativeMouseState(&mouse_delta_x, nullptr);
 
 	const float steer_angle = mouse_delta_x * settings.car.mouseSensibility;
 	carSteerDirection = glm::rotate(glm::normalize(carSteerDirection), steer_angle);
