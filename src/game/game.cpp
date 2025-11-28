@@ -153,6 +153,20 @@ struct CameraSettings {
 	NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(CameraSettings, zoom, shake);
 };
 
+enum class FramerateLimit : int {
+	Off,
+	Fps30,
+	Fps60,
+	Fps120,
+};
+
+NLOHMANN_JSON_SERIALIZE_ENUM(FramerateLimit, {
+												 {FramerateLimit::Off, "Off"},
+												 {FramerateLimit::Fps30, "Fps30"},
+												 {FramerateLimit::Fps60, "Fps60"},
+												 {FramerateLimit::Fps120, "Fps120"},
+											 });
+
 struct RenderSettings {
 	int skidTileResolution = 256;
 	float4 skidColor = float4{0.5f};
@@ -161,9 +175,10 @@ struct RenderSettings {
 	float backgroundScale = 0.2f;
 	float backgroundDisplacement = 0.2f;
 	float3 backgroundColor = float3{0.5f};
+	FramerateLimit framerateLimit = FramerateLimit::Off;
 
-	NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(RenderSettings, skidTileResolution, skidColor, skidSize, backgroundPeriod, backgroundScale, backgroundDisplacement,
-												backgroundColor);
+	NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(RenderSettings, skidTileResolution, skidColor, skidSize, backgroundPeriod, backgroundScale, backgroundDisplacement, backgroundColor,
+												framerateLimit);
 };
 
 struct CarSettings {
@@ -234,6 +249,9 @@ void Settings::update(const Storage& storage) {
 			ImGui::DragFloat("Background Scale", &render.backgroundScale, 0.01f);
 			ImGui::DragFloat("Background Displacement", &render.backgroundDisplacement, 0.01f);
 			ImGui::ColorEdit3("Background Color", &render.backgroundColor.r);
+
+			std::array<const char*, 4> framerate_captions{"Off", "30 fps", "60 fps", "120 fps"};
+			ImGui::Combo("Framerate Limit", reinterpret_cast<int*>(&render.framerateLimit), framerate_captions.data(), framerate_captions.size());
 		}
 
 		if (ImGui::CollapsingHeader("Camera", ImGuiTreeNodeFlags_DefaultOpen)) {
@@ -1920,6 +1938,24 @@ SDL_AppResult App::iterate() {
 		ImGui_ImplSDLRenderer3_RenderDrawData(ImGui::GetDrawData(), renderer);
 	}
 #endif
+
+	{
+		const std::chrono::microseconds elapsed = std::chrono::microseconds(SDL_GetTicksNS() / 1000) - now;
+		constexpr std::chrono::microseconds margin(4000);
+		std::chrono::microseconds delay(0);
+
+		if (settings.render.framerateLimit == FramerateLimit::Fps30) {
+			delay = std::chrono::microseconds(1000000 / 30) - elapsed - margin;
+		} else if (settings.render.framerateLimit == FramerateLimit::Fps60) {
+			delay = std::chrono::microseconds(1000000 / 60) - elapsed - margin;
+		} else if (settings.render.framerateLimit == FramerateLimit::Fps120) {
+			delay = std::chrono::microseconds(1000000 / 120) - elapsed - margin;
+		}
+
+		if (delay.count() > 0) {
+			SDL_DelayNS(delay.count() * 1000);
+		}
+	}
 
 	const bool present_ok = SDL_RenderPresent(renderer);
 	SDL_assert(present_ok);
