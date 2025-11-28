@@ -72,13 +72,14 @@
 		"backgroundDisplacement": 0.20000000298023224,
 		"backgroundPeriod": 5.0,
 		"backgroundScale": 0.20000000298023224,
+		"framerateLimit": "Off",
 		"skidColor": {
-			"w": 0.5,
-			"x": 0.5,
-			"y": 0.5,
-			"z": 0.5
+			"w": 0.7529411911964417,
+			"x": 0.501960813999176,
+			"y": 0.501960813999176,
+			"z": 0.501960813999176
 		},
 		"skidSize": 2.0,
-		"skidTileResolution": 256
+		"skidTileResolution": 128
 	}
 }
