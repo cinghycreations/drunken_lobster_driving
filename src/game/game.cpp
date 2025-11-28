@@ -893,6 +893,9 @@ void Session::updateCarStats(const std::chrono::microseconds delta_time) {
 }
 
 void Session::updateCarDrive(const std::chrono::microseconds delta_time, const float mouse_delta_x) {
+	const bool prev_skid = carSkid;
+	const float2 prev_skid_position = carPrevPosition;
+
 	carPrevPosition = carPosition;
 
 	const float steer_angle = mouse_delta_x * settings.car.mouseSensibility;
@@ -905,7 +908,7 @@ void Session::updateCarDrive(const std::chrono::microseconds delta_time, const f
 	carForwardDirection = glm::rotate(carForwardDirection, std::clamp(wanted_angle, -max_angle, max_angle));
 	carPosition += carForwardDirection * (settings.car.baseSpeed * carStats.speedMultiplier) * delta_secs;
 
-	if (carSkid) {
+	if (prev_skid && carSkid) {
 		const int2 car_tile = carPosition;
 		CellState& cell = cells.at(car_tile.y * worldSize.x + car_tile.x);
 
@@ -916,21 +919,20 @@ void Session::updateCarDrive(const std::chrono::microseconds delta_time, const f
 			SDL_SetRenderDrawColorFloat(renderer, settings.render.skidColor.r, settings.render.skidColor.g, settings.render.skidColor.b, settings.render.skidColor.a);
 		SDL_assert(set_color_ok);
 
+		const float2 tile_topright = worldToRender(float2(car_tile) + float2(0.5f) - float2(1, 0));
+		const float2 tile_bottomleft = worldToRender(float2(car_tile) + float2(0.5f) + float2(1, 0));
 		for (const float2 wheel_delta : {float2(-0.25f, 0.1f), float2(-0.25f, -0.1f)}) {
-			const float2 wheels_position = carPosition + carForwardDirection * settings.car.size * wheel_delta.x +
-										   glm::rotate(carForwardDirection, glm::radians<float>(90)) * settings.car.size * wheel_delta.y;
+			const float2 start_wheels_pos = carPosition + carForwardDirection * settings.car.size * wheel_delta.x +
+											glm::rotate(carForwardDirection, glm::radians<float>(90)) * settings.car.size * wheel_delta.y;
+			const float2 start_skid_pos = worldToRender(start_wheels_pos);
+			const float2 start_skid_tilepos = (start_skid_pos - tile_topright) / (tile_bottomleft - tile_topright) * float2(cell.skidTexture->w, cell.skidTexture->h);
+			const float2 end_wheels_pos = prev_skid_position + carForwardDirection * settings.car.size * wheel_delta.x +
+										  glm::rotate(carForwardDirection, glm::radians<float>(90)) * settings.car.size * wheel_delta.y;
+			const float2 end_skid_pos = worldToRender(end_wheels_pos);
+			const float2 end_skid_tilepos = (end_skid_pos - tile_topright) / (tile_bottomleft - tile_topright) * float2(cell.skidTexture->w, cell.skidTexture->h);
 
-			const float2 tile_topright = worldToRender(float2(car_tile) + float2(0.5f) - float2(1, 0));
-			const float2 tile_bottomleft = worldToRender(float2(car_tile) + float2(0.5f) + float2(1, 0));
-			const float2 skid_position = worldToRender(wheels_position);
-			const float2 skid_position_in_tile = (skid_position - tile_topright) / (tile_bottomleft - tile_topright) * float2(cell.skidTexture->w, cell.skidTexture->h);
-			const SDL_FRect skid_rect{.x = skid_position_in_tile.x - settings.render.skidSize / 2,
-									  .y = skid_position_in_tile.y - settings.render.skidSize / 2,
-									  .w = settings.render.skidSize,
-									  .h = settings.render.skidSize};
-
-			const bool render_rect_ok = SDL_RenderFillRect(renderer, &skid_rect);
-			SDL_assert(render_rect_ok);
+			const bool render_line_ok = SDL_RenderLine(renderer, start_skid_tilepos.x, start_skid_tilepos.y, end_skid_tilepos.x, end_skid_tilepos.y);
+			SDL_assert(render_line_ok);
 		}
 
 		const bool restore_target_ok = SDL_SetRenderTarget(renderer, nullptr);
