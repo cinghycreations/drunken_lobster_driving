@@ -30,23 +30,15 @@
         }
 
         panel {
-            display: flex;
-            flex-direction: column;
             padding: 0.5rem;
-        }
-
-        panel {
             padding-top: 0.25rem;
             padding-bottom: 0.25rem;
+            height: 2.5rem;
         }
 
-        panel>p {
+        panel p {
             margin-top: 0.25rem;
             margin-bottom: 0.25rem;
-        }
-
-        .sequence {
-            height: 2rem;
         }
 
         .sequence img {
@@ -55,15 +47,31 @@
             margin: 0rem;
             padding: 0rem;
         }
+
+        panel {
+            display: flex;
+            flex-direction: column;
+        }
+
+        panel>div {
+            display: flex;
+            flex: 1;
+            flex-direction: row;
+            align-items: center;
+        }
     </style>
 </head>
 
 <body data-model="session">
     <header>
         <panel>
-            <p data-if="currentMode == 'Sequence'">Score {{score}}</p>
-            <p class="sequence" data-if="currentMode == 'Sequence'" data-rml="sequence"></p>
-            <p data-if="currentMode == 'Time Attack'">Time {{time}}</p>
+            <div data-if="currentMode == 'Sequence'">
+                <p>Score {{score}}</p>
+                <p class="sequence" data-rml="sequence"></p>
+            </div>
+            <div data-if="currentMode == 'Time Attack'">
+                <p>Time {{time}}</p>
+            </div>
         </panel>
     </header>
     <main>

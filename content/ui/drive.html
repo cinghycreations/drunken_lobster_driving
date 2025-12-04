@@ -2,31 +2,20 @@
 <html>
 
 <head>
-    <title>How to Play</title>
+    <title>Drive</title>
     <link rel="stylesheet" type="text/css" href="/ui/common.css" />
     <style>
-        body {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-        }
+        /* styling */
 
         panel {
-            width: 25rem;
+            width: 45rem;
             padding: 0.5rem;
-            display: flex;
-            flex-direction: column;
+
         }
 
         panel>p {
             font-size: 2rem;
             text-align: center;
-        }
-
-        button.level {
-            display: flex;
-            flex-direction: row;
-            justify-content: space-between;
         }
 
         button.level>p {
@@ -37,54 +26,104 @@
         div.spacer {
             height: 2rem;
         }
+
+        /* layout */
+
+        body,
+        panel,
+        button.level,
+        .levels-row,
+        .levels-column {
+            display: flex;
+        }
+
+        body {
+            justify-content: center;
+            align-items: center;
+        }
+
+        panel {
+            flex-direction: column;
+        }
+
+        .levels-row {
+            flex-direction: row;
+        }
+
+        .levels-column {
+            flex: 1;
+            flex-direction: column;
+        }
+
+        button.level {
+            flex-direction: row;
+            /* justify-content: space-between; */
+        }
+
+        .levelName {
+            flex: 2;
+        }
+
+        .levelRecord {
+            flex: 1;
+        }
+
+        .levelRank {
+            flex: 2;
+        }
     </style>
 </head>
 
 <body data-model="launcher">
     <panel>
-        <p>Choose Level</p>
         <button data-event-click="switchMode()">Mode: {{currentMode}}</button>
         <div class="spacer"></div>
-        <button class="level" data-event-click="playLevel(0)">
-            <p>{{levelNames[0]}}</p>
-            <p>{{levelRecords[0]}}</p>
-            <p>{{levelRanks[0]}}</p>
-        </button>
-        <button class="level" data-event-click="playLevel(1)">
-            <p>{{levelNames[1]}}</p>
-            <p>{{levelRecords[1]}}</p>
-            <p>{{levelRanks[1]}}</p>
-        </button>
-        <button class="level" data-event-click="playLevel(2)">
-            <p>{{levelNames[2]}}</p>
-            <p>{{levelRecords[2]}}</p>
-            <p>{{levelRanks[2]}}</p>
-        </button>
-        <button class="level" data-event-click="playLevel(3)">
-            <p>{{levelNames[3]}}</p>
-            <p>{{levelRecords[3]}}</p>
-            <p>{{levelRanks[3]}}</p>
-        </button>
-        <button class="level" data-event-click="playLevel(4)">
-            <p>{{levelNames[4]}}</p>
-            <p>{{levelRecords[4]}}</p>
-            <p>{{levelRanks[4]}}</p>
-        </button>
-        <button class="level" data-event-click="playLevel(5)">
-            <p>{{levelNames[5]}}</p>
-            <p>{{levelRecords[5]}}</p>
-            <p>{{levelRanks[5]}}</p>
-        </button>
-        <button class="level" data-event-click="playLevel(6)">
-            <p>{{levelNames[6]}}</p>
-            <p>{{levelRecords[6]}}</p>
-            <p>{{levelRanks[6]}}</p>
-        </button>
-        <button class="level" data-event-click="playLevel(7)">
-            <p>{{levelNames[7]}}</p>
-            <p>{{levelRecords[7]}}</p>
-            <p>{{levelRanks[7]}}</p>
-        </button>
+        <div class="levels-row">
+            <div class="levels-column">
+                <button class="level" data-event-click="playLevel(0)">
+                    <p class="levelName">{{levelNames[0]}}</p>
+                    <p class="levelRecord">{{levelRecords[0]}}</p>
+                    <p class="levelRank">{{levelRanks[0]}}</p>
+                </button>
+                <button class="level" data-event-click="playLevel(1)">
+                    <p class="levelName">{{levelNames[1]}}</p>
+                    <p class="levelRecord">{{levelRecords[1]}}</p>
+                    <p class="levelRank">{{levelRanks[1]}}</p>
+                </button>
+                <button class="level" data-event-click="playLevel(2)">
+                    <p class="levelName">{{levelNames[2]}}</p>
+                    <p class="levelRecord">{{levelRecords[2]}}</p>
+                    <p class="levelRank">{{levelRanks[2]}}</p>
+                </button>
+                <button class="level" data-event-click="playLevel(3)">
+                    <p class="levelName">{{levelNames[3]}}</p>
+                    <p class="levelRecord">{{levelRecords[3]}}</p>
+                    <p class="levelRank">{{levelRanks[3]}}</p>
+                </button>
+            </div>
+            <div class="levels-column">
+                <button class="level" data-event-click="playLevel(4)">
+                    <p class="levelName">{{levelNames[4]}}</p>
+                    <p class="levelRecord">{{levelRecords[4]}}</p>
+                    <p class="levelRank">{{levelRanks[4]}}</p>
+                </button>
+                <button class="level" data-event-click="playLevel(5)">
+                    <p class="levelName">{{levelNames[5]}}</p>
+                    <p class="levelRecord">{{levelRecords[5]}}</p>
+                    <p class="levelRank">{{levelRanks[5]}}</p>
+                </button>
+                <button class="level" data-event-click="playLevel(6)">
+                    <p class="levelName">{{levelNames[6]}}</p>
+                    <p class="levelRecord">{{levelRecords[6]}}</p>
+                    <p class="levelRank">{{levelRanks[6]}}</p>
+                </button>
+                <button class="level" data-event-click="playLevel(7)">
+                    <p class="levelName">{{levelNames[7]}}</p>
+                    <p class="levelRecord">{{levelRecords[7]}}</p>
+                    <p class="levelRank">{{levelRanks[7]}}</p>
+                </button>
+            </div>
+        </div>
         <div class="spacer"></div>
         <button data-event-click="goToHome()">Back</button>
     </panel>

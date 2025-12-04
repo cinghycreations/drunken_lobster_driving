@@ -10,6 +10,13 @@
     color: #1e90ff;
 }
 
+@media (min-resolution: 1.75x) {
+    * {
+        font-size: 16px;
+        font-size: 16dp;
+    }
+}
+
 html,
 body {
     width: 100%;
@@ -26,6 +33,7 @@ panel {
 }
 
 button {
+    font-size: 1.5rem;
     text-align: center;
     border-width: 0.1rem;
     border-style: solid;

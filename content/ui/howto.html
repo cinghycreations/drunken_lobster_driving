@@ -12,22 +12,18 @@
         }
 
         panel {
-            width: 20rem;
+            width: 45rem;
             padding: 0.5rem;
             display: flex;
             flex-direction: column;
         }
 
-        panel>* {
-            display: block;
+        p {
             margin: 1rem 0rem;
+            text-align: center;
         }
 
-        div.tutorial>p {
-            margin: 0rem;
-        }
-
-        div.tutorial>p>img {
+        p>img {
             width: 1.5rem;
             margin: 0rem;
             padding: 0rem;
@@ -38,26 +34,21 @@
 <body data-model="launcher">
     <panel>
         <p>Drive like a drunken lobster and destroy everything!</p>
-        <div class="tutorial">
-            <p>
-                Sequence Mode: increase your score by destroying streaks of identical buildings like
-                <img src="/buildings/garden0000.png" />
-                <img src="/buildings/garden0000.png" />
-                <img src="/buildings/garden0000.png" />
-                or
-                <img src="/buildings/gaspump0000.png" />
-                <img src="/buildings/gaspump0000.png" />
-                <img src="/buildings/gaspump0000.png" />
-                <img src="/buildings/gaspump0000.png" />
-                in a short time. Skyscrapers <img src="/buildings/skyscraper0000.png" />
-                give a 2x multiplier while Nuclear plants <img src="/buildings/nuclear0000.png" />
-                a 5x multiplier
-            </p>
-        </div>
-
-        <div class="tutorial">
-            <p>Time Attack Mode: destroy all buildings in the shortest time possible</p>
-        </div>
+        <p>
+            Sequence Mode: increase your score by destroying streaks of identical buildings like
+            <img src="/buildings/garden0000.png" />
+            <img src="/buildings/garden0000.png" />
+            <img src="/buildings/garden0000.png" />
+            or
+            <img src="/buildings/gaspump0000.png" />
+            <img src="/buildings/gaspump0000.png" />
+            <img src="/buildings/gaspump0000.png" />
+            <img src="/buildings/gaspump0000.png" />
+            in a short time. Skyscrapers <img src="/buildings/skyscraper0000.png" />
+            give a 2x multiplier while Nuclear plants <img src="/buildings/nuclear0000.png" />
+            a 5x multiplier
+        </p>
+        <p>Time Attack Mode: destroy all buildings in the shortest time possible</p>
         <button data-event-click="goToHome()">Back</button>
     </panel>
 </body>
