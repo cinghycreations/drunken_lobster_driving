@@ -3,5 +3,5 @@
 imgui.ini
 .gradle/
 /android-project/build/
-/android-project/app/build/
-/android-project/app/libs/
+/android-project/drunken_lobster_driving/build/
+/android-project/drunken_lobster_driving/libs/

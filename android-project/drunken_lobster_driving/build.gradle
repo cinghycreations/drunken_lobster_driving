@@ -3,7 +3,7 @@ plugins {
 }
 
 android {
-    namespace = "org.libsdl.app"
+    namespace = "it.cinghycreations.drunken_lobster_driving"
     compileSdkVersion 35
     defaultConfig {
         minSdkVersion 21
