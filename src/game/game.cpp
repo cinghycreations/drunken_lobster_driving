@@ -1520,7 +1520,9 @@ void Launcher::update(const std::chrono::microseconds real_total_time, const std
 	{
 		int numkeys;
 		const bool* keystates = SDL_GetKeyboardState(&numkeys);
-		if (session && !session->isPaused() && SDL_SCANCODE_ESCAPE < numkeys && keystates[SDL_SCANCODE_ESCAPE]) {
+		const bool esc_pressed = SDL_SCANCODE_ESCAPE < numkeys && keystates[SDL_SCANCODE_ESCAPE];
+		const bool back_pressed = SDL_SCANCODE_AC_BACK < numkeys && keystates[SDL_SCANCODE_AC_BACK];
+		if (session && !session->isPaused() && (esc_pressed || back_pressed)) {
 			session->pause(true);
 			captureMouse(false);
 			goToPage("ui/pause.html");
