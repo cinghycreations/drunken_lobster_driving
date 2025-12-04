@@ -2008,13 +2008,3 @@ SDL_AppResult SDL_AppIterate(void* appstate) {
 void SDL_AppQuit(void* appstate, SDL_AppResult result) {
 	delete static_cast<App*>(appstate);
 }
-
-//////////
-// Todo //
-//////////
-
-// TODO Remake UI for mobile platforms
-// TODO Set proper target scores and times for levels
-// TODO Add Lobster model to car and background
-// TODO Everything related to sound and music.
-// TODO Screenshots, GIFs and other marketing materials
