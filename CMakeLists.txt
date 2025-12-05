@@ -114,6 +114,7 @@ endif()
 
 if ( "${CMAKE_SYSTEM_NAME}" STREQUAL "Android" )
 	install( TARGETS drunken_lobster_driving LIBRARY DESTINATION "${CMAKE_CURRENT_SOURCE_DIR}/android-project/drunken_lobster_driving/libs/arm64-v8a" )
+	install( CODE "execute_process( COMMAND gradlew.bat build WORKING_DIRECTORY \"${CMAKE_CURRENT_SOURCE_DIR}/android-project\" )" )
 	install( CODE "execute_process( COMMAND gradlew.bat bundle WORKING_DIRECTORY \"${CMAKE_CURRENT_SOURCE_DIR}/android-project\" )" )
 	install( CODE "file( COPY \"${CMAKE_CURRENT_SOURCE_DIR}/android-project/drunken_lobster_driving/build/outputs/apk/release/drunken_lobster_driving-release.apk\" DESTINATION \"${CMAKE_INSTALL_PREFIX}\" )" )
 	install( CODE "file( COPY \"${CMAKE_CURRENT_SOURCE_DIR}/android-project/drunken_lobster_driving/build/outputs/bundle/release/drunken_lobster_driving-release.aab\" DESTINATION \"${CMAKE_INSTALL_PREFIX}\" )" )
