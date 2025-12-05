@@ -10,6 +10,7 @@ option( CC_HAS_EXECUTABLE_AS_LIBRARY "Build a shared library instead of an execu
 set( CC_BUILD_VERSION "local" CACHE STRING "Build Version" )
 set( CC_BUILD_PLATFORM "local" CACHE STRING "Build Platform" )
 set( CC_BUILD_CONFIG "local" CACHE STRING "Build Config" )
+set( CC_BUILD_NUMBER "local" CACHE STRING "Build number" )
 set( CC_BUILD_COMMIT "local" CACHE STRING "Build commit" )
 
 set( BUILD_SHARED_LIBS OFF )
@@ -90,6 +91,7 @@ target_compile_definitions( build_metadata INTERFACE
 	CC_BUILD_VERSION="${CC_BUILD_VERSION}"
 	CC_BUILD_PLATFORM="${CC_BUILD_PLATFORM}"
 	CC_BUILD_CONFIG="${CC_BUILD_CONFIG}"
+	CC_BUILD_NUMBER="${CC_BUILD_NUMBER}"
 	CC_BUILD_COMMIT="${CC_BUILD_COMMIT}"
 )
 
