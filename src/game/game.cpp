@@ -455,6 +455,10 @@ public:
 	void update(const std::chrono::microseconds delta_real_time);
 	void render();
 
+	float4 getBackgroundColor() const {
+		return backgroundColor;
+	}
+
 	void pause(const bool _paused);
 
 	bool isPaused() const {
@@ -516,6 +520,7 @@ private:
 	SDL_Window* window;
 	SDL_Renderer* renderer;
 	int2 worldSize;
+	float4 backgroundColor;
 	float2 worldStartingPosition = {0.5f, 0.5f};
 	bool renderEnableGrid = false;
 	float2 cameraPosition = {0, 0};
@@ -655,6 +660,7 @@ Session::Session(const Settings& _settings, const Storage& _storage, const Conte
 	SDL_assert(level->getProp("startX"));
 	SDL_assert(level->getProp("startY"));
 
+	backgroundColor = float4(level->getBackgroundColor().r, level->getBackgroundColor().g, level->getBackgroundColor().b, level->getBackgroundColor().a) * (1.0f / 255.0f);
 	worldStartingPosition = float2(level->getProp("startX")->getValue<int>(), level->getProp("startY")->getValue<int>()) + float2(0.5f);
 	carPosition = worldStartingPosition;
 }
@@ -1259,6 +1265,8 @@ public:
 	Launcher(const Settings& _settings, const Storage& _storage, Content& _content, SDL_Window* _window, SDL_Renderer* _renderer, Rml::Context* ui_context);
 	~Launcher();
 
+	float4 getBackgroundColor() const;
+
 	void update(const std::chrono::microseconds real_total_time, const std::chrono::microseconds delta_real_time);
 	void render();
 
@@ -1509,6 +1517,10 @@ void Launcher::refreshGameMode(const GameMode game_mode) {
 	launcherModel.DirtyVariable("levelRecords");
 	launcherModel.DirtyVariable("levelRanks");
 	sessionModel.DirtyVariable("currentMode");
+}
+
+float4 Launcher::getBackgroundColor() const {
+	return session ? session->getBackgroundColor() : float4(settings.render.backgroundColor, 1);
 }
 
 void Launcher::update(const std::chrono::microseconds real_total_time, const std::chrono::microseconds real_delta_time) {
@@ -1913,7 +1925,8 @@ SDL_AppResult App::iterate() {
 	settings.update(*storage);
 	launcher->update(realTotalTime, realDeltaTime);
 
-	const bool set_color_ok = SDL_SetRenderDrawColorFloat(renderer, 0, 0, 0, 1);
+	const auto background_color = launcher->getBackgroundColor();
+	const bool set_color_ok = SDL_SetRenderDrawColorFloat(renderer, background_color.r, background_color.g, background_color.b, background_color.a);
 	SDL_assert(set_color_ok);
 
 	const bool clear_ok = SDL_RenderClear(renderer);
