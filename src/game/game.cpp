@@ -1,6 +1,5 @@
 #define SDL_MAIN_USE_CALLBACKS
 #include <RmlUi/Core.h>
-#include <RmlUi/Debugger.h>
 #include <RmlUi_Platform_SDL.h>
 #include <RmlUi_Renderer_SDL.h>
 #include <SDL3/SDL_assert.h>
@@ -20,6 +19,7 @@
 #include <string_view>
 #include <tileson.hpp>
 #ifdef CC_HAS_DEVUI
+#include <RmlUi/Debugger.h>
 #include <imgui.h>
 #include <imgui_impl_sdl3.h>
 #include <imgui_impl_sdlrenderer3.h>
@@ -1865,8 +1865,10 @@ App::App(int argc, char* argv[]) {
 		uiContext = Rml::CreateContext("RmlContext", Rml::Vector2i(1920, 1080));
 		SDL_assert(uiContext);
 
+#ifdef CC_HAS_DEVUI
 		const bool debugger_init_ok = Rml::Debugger::Initialise(uiContext);
 		SDL_assert(debugger_init_ok);
+#endif
 
 		const bool load_font1_ok = Rml::LoadFontFace("fonts/NotoSans-Regular.ttf", true);
 		SDL_assert(load_font1_ok);
