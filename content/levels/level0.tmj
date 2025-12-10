@@ -523,6 +523,31 @@
                  "image":"..\/roads\/road0044.png",
                  "imageheight":512,
                  "imagewidth":512
+                }, 
+                {
+                 "id":44,
+                 "image":"..\/roads\/road0045.png",
+                 "imageheight":512,
+                 "imagewidth":512
+                },
+            
+                {
+                 "id":45,
+                 "image":"..\/roads\/road0046.png",
+                 "imageheight":512,
+                 "imagewidth":512
+                }, 
+                {
+                 "id":46,
+                 "image":"..\/roads\/road0047.png",
+                 "imageheight":512,
+                 "imagewidth":512
+                }, 
+                {
+                 "id":47,
+                 "image":"..\/roads\/road0048.png",
+                 "imageheight":512,
+                 "imagewidth":512
                 }],
          "tilewidth":512
         }],
