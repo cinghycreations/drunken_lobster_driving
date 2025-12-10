@@ -26,8 +26,8 @@ def 'main build windows' [version: string] {
     let build_number = get_build_number
     let release_version = get_release_version $version $build_number
 
-    #cmake --preset windows-dev -D CMAKE_PROJECT_VERSION=$'($release_version)'
-    #cmake --build --preset windows-dev --target install
+    cmake --preset windows-dev -D CMAKE_PROJECT_VERSION=$'($release_version)'
+    cmake --build --preset windows-dev --target install
 
     cmake --preset windows-release -D CMAKE_PROJECT_VERSION=$'($release_version)'
     cmake --build --preset windows-release --target install
@@ -42,16 +42,23 @@ def 'main upload windows' [version: string] {
 
 def 'main upload android' [version: string] {
     let build_number = get_build_number
-    let commit = get_last_commit
     let release_version = get_release_version $version $build_number
 
     temp/butler-windows-amd64/butler.exe push temp/install/android-release/drunken_lobster_driving-release.apk cinghycreations/drunken-lobster-driving:android --userversion $release_version
 }
 
-def 'main' [version: string] {
-    main clean
+def 'main build' [version: string] {
     main build windows $version
     main build android $version
+}
+
+def 'main upload' [version: string] {
     main upload windows $version
     main upload android $version
+}
+
+def 'main' [version: string] {
+    main clean
+    main build $version
+    main upload $version
 }
