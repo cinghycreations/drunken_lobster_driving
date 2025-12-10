@@ -2,16 +2,11 @@ cmake_minimum_required( VERSION 3.31 )
 set( CMAKE_CXX_STANDARD 20 )
 set( CMAKE_CXX_STANDARD_REQUIRED ON )
 set( CMAKE_CXX_SCAN_FOR_MODULES OFF )
-project( drunken_lobster_driving )
+project( drunken_lobster_driving VERSION 0 )
 
 option( CC_HAS_DEVUI "Enable Dev Ui" ON )
 option( CC_HAS_EMBED_CONTENT "Embed content in executable" OFF )
 option( CC_HAS_EXECUTABLE_AS_LIBRARY "Build a shared library instead of an executable" OFF )
-set( CC_BUILD_VERSION "local" CACHE STRING "Build Version" )
-set( CC_BUILD_PLATFORM "local" CACHE STRING "Build Platform" )
-set( CC_BUILD_CONFIG "local" CACHE STRING "Build Config" )
-set( CC_BUILD_NUMBER "local" CACHE STRING "Build number" )
-set( CC_BUILD_COMMIT "local" CACHE STRING "Build commit" )
 
 set( BUILD_SHARED_LIBS OFF )
 set( SDL_STATIC ON )
@@ -86,23 +81,14 @@ target_compile_definitions( RmlUiBackend PUBLIC RMLUI_SDL_VERSION_MAJOR=3 )
 target_include_directories( RmlUiBackend PUBLIC ext/RmlUi/Backends )
 target_link_libraries( RmlUiBackend PUBLIC RmlUi::Core SDL3-static SDL3_image-static )
 
-add_library( build_metadata INTERFACE )
-target_compile_definitions( build_metadata INTERFACE
-	CC_BUILD_VERSION="${CC_BUILD_VERSION}"
-	CC_BUILD_PLATFORM="${CC_BUILD_PLATFORM}"
-	CC_BUILD_CONFIG="${CC_BUILD_CONFIG}"
-	CC_BUILD_NUMBER="${CC_BUILD_NUMBER}"
-	CC_BUILD_COMMIT="${CC_BUILD_COMMIT}"
-)
-
 if ( CC_HAS_EXECUTABLE_AS_LIBRARY )
 	add_library( drunken_lobster_driving SHARED src/game/game.cpp )
 else()
 	add_executable( drunken_lobster_driving src/game/game.cpp )
 endif()
 target_include_directories( drunken_lobster_driving PUBLIC src/game )
-target_compile_definitions( drunken_lobster_driving PUBLIC GLM_ENABLE_EXPERIMENTAL SDL_ASSERT_LEVEL=2 )
-target_link_libraries( drunken_lobster_driving PUBLIC SDL_uclibc SDL3-static SDL3_image-static fmt glm nlohmann_json tileson RmlUiBackend build_metadata )
+target_compile_definitions( drunken_lobster_driving PUBLIC GLM_ENABLE_EXPERIMENTAL SDL_ASSERT_LEVEL=2 CC_BUILD_VERSION="${CMAKE_PROJECT_VERSION}" )
+target_link_libraries( drunken_lobster_driving PUBLIC SDL_uclibc SDL3-static SDL3_image-static fmt glm nlohmann_json tileson RmlUiBackend )
 if ( CC_HAS_DEVUI )
 	target_link_libraries( drunken_lobster_driving PUBLIC ImGuiBackend RmlUi::Debugger )
 	target_compile_definitions( drunken_lobster_driving PUBLIC CC_HAS_DEVUI )

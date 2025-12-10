@@ -11,5 +11,5 @@
 - [ ] Properly implement localization
 - [ ] Add other control methods like keyboard, gamepad
 - [ ] Remake the first level as "Parking Lot" to allow people to practice
-- [ ] Simplify build versioning
+- [x] Simplify build versioning
 - [ ] Add some mini-tutorial, maybe in the lead in to the level
