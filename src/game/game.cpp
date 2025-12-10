@@ -383,6 +383,7 @@ struct Content {
 	Flipbook houseFlipbook;
 	Flipbook nuclearFlipbook;
 	Flipbook skyscraperFlipbook;
+	Flipbook backgroundFlipbook;
 
 	Content(Storage& _storage, SDL_Renderer* renderer);
 };
@@ -391,7 +392,8 @@ Content::Content(Storage& _storage, SDL_Renderer* renderer)
 	: storage(_storage), carFlipbook(storage, renderer, "car/car{:04}.png", 1), groundFlipbook(storage, renderer, "roads/road{:04}.png", 1),
 	  buildingsFlipbook(storage, renderer, "buildings/buildings{:04}.png", 1), gardenFlipbook(storage, renderer, "buildings/garden{:04}.png", 0),
 	  gaspumpFlipbook(storage, renderer, "buildings/gaspump{:04}.png", 0), houseFlipbook(storage, renderer, "buildings/house{:04}.png", 0),
-	  nuclearFlipbook(storage, renderer, "buildings/nuclear{:04}.png", 0), skyscraperFlipbook(storage, renderer, "buildings/skyscraper{:04}.png", 0) {}
+	  nuclearFlipbook(storage, renderer, "buildings/nuclear{:04}.png", 0), skyscraperFlipbook(storage, renderer, "buildings/skyscraper{:04}.png", 0),
+	  backgroundFlipbook(storage, renderer, "background/background{:04}.png", 1) {}
 
 /////////////
 // Session //
@@ -1773,31 +1775,34 @@ void Launcher::renderBackground() {
 	const bool output_size_ok = SDL_GetRenderOutputSize(renderer, &render_width, &render_height);
 	SDL_assert(output_size_ok);
 
-	SDL_Texture* texture = content.carFlipbook.textures.front();
+	const float tile_size = float(render_width) * settings.render.backgroundScale;
+	const int tiles_x = int(std::ceil(render_width / tile_size)) + 1;
+	const int tiles_y = int(std::ceil(render_height / tile_size)) + 1;
+
 	const std::chrono::microseconds sin_period = TimeUtils::floatSecondsToMicroseconds(settings.render.backgroundPeriod);
 	const std::chrono::microseconds cos_period = TimeUtils::floatSecondsToMicroseconds(settings.render.backgroundPeriod * 1.3f);
 	const float sin_angle = float(backgroundTime.count() % sin_period.count()) / float(sin_period.count()) * std::numbers::pi * 2;
 	const float cos_angle = float(backgroundTime.count() % cos_period.count()) / float(cos_period.count()) * std::numbers::pi * 2;
-	const float texture_unit = float(render_width) * settings.render.backgroundScale;
-	const float displacement_unit = float(render_width) * settings.render.backgroundDisplacement;
+	const float displacement_unit = tile_size * settings.render.backgroundDisplacement;
 	const float displacement_x = displacement_unit * std::cos(cos_angle);
 	const float displacement_y = displacement_unit * std::sin(sin_angle);
-	const float texture_scale = texture_unit / float(texture->w);
-	const SDL_FRect dest_rect{
-		.x = displacement_x - (std::floor(displacement_x / texture_unit) + 1) * texture_unit,
-		.y = displacement_y - (std::floor(displacement_y / texture_unit) + 1) * texture_unit,
-		.w = render_width + texture_unit,
-		.h = render_height + texture_unit,
-	};
 
-	const bool set_color_ok = SDL_SetRenderDrawColorFloat(renderer, settings.render.backgroundColor.r, settings.render.backgroundColor.g, settings.render.backgroundColor.b, 1);
-	SDL_assert(set_color_ok);
+	for (int i = 0; i < tiles_y + 1; ++i) {
+		for (int j = 0; j < tiles_x + 1; ++j) {
+			const int texture_index = (i + j) % content.backgroundFlipbook.textures.size();
+			SDL_Texture* texture = content.backgroundFlipbook.textures.at(texture_index);
 
-	const bool render_rect_ok = SDL_RenderFillRect(renderer, nullptr);
-	SDL_assert(render_rect_ok);
+			const SDL_FRect dest_rect{
+				.x = displacement_x + (j - 1) * tile_size,
+				.y = displacement_y + (i - 1) * tile_size,
+				.w = tile_size,
+				.h = tile_size,
+			};
 
-	const bool render_texture_ok = SDL_RenderTextureTiled(renderer, texture, nullptr, texture_scale, &dest_rect);
-	SDL_assert(render_texture_ok);
+			const bool render_texture_ok = SDL_RenderTextureTiled(renderer, texture, nullptr, 1, &dest_rect);
+			SDL_assert(render_texture_ok);
+		}
+	}
 }
 
 void Launcher::captureMouse(const bool capture) {

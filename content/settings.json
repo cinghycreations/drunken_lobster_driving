@@ -71,7 +71,7 @@
 			"y": 0.8549019694328308,
 			"z": 0.7254902124404907
 		},
-		"backgroundDisplacement": 0.20000000298023224,
+		"backgroundDisplacement": 0.75,
 		"backgroundPeriod": 5.0,
 		"backgroundScale": 0.20000000298023224,
 		"framerateLimit": "Off",
