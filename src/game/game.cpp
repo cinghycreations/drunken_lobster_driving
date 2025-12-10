@@ -184,13 +184,16 @@ struct RenderSettings {
 struct CarSettings {
 	float size = 0.2f;
 	float mouseSensibility = 0.01f;
+	float gamepadSensibility = 0.01f;
+	float keyboardSensibility = 0.01f;
 	float grip = 1;
 	float baseSpeed = 0.1f;
 	float2 speedMultiplierRange = float2(1, 4);
 	float2 speedMultiplierStackedRange = float2(1, 5);
 	float speedMultiplierDecrease = 0.5f;
 
-	NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(CarSettings, size, mouseSensibility, grip, baseSpeed, speedMultiplierRange, speedMultiplierStackedRange, speedMultiplierDecrease);
+	NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(CarSettings, size, mouseSensibility, gamepadSensibility, keyboardSensibility, grip, baseSpeed, speedMultiplierRange,
+												speedMultiplierStackedRange, speedMultiplierDecrease);
 };
 
 struct BuildingSettings {
@@ -265,6 +268,8 @@ void Settings::update(const Storage& storage) {
 		if (ImGui::CollapsingHeader("Car", ImGuiTreeNodeFlags_DefaultOpen)) {
 			ImGui::DragFloat("Size", &car.size, 0.01f, 0.01f, 5);
 			ImGui::DragFloat("Mouse Sensibility", &car.mouseSensibility, 0.01f);
+			ImGui::DragFloat("Keyboard Sensibility", &car.keyboardSensibility, 0.01f);
+			ImGui::DragFloat("Gamepad Sensibility", &car.gamepadSensibility, 0.01f);
 			ImGui::SliderFloat("Grip", &car.grip, 0, 1);
 			ImGui::DragFloat("Base Speed", &car.baseSpeed, 0.01f);
 			ImGui::DragFloat2("Speed Multiplier Range", &car.speedMultiplierRange.x, 0.01f);
@@ -546,6 +551,8 @@ private:
 	std::optional<std::chrono::microseconds> finishTime;
 	bool paused = false;
 
+	std::optional<SDL_Gamepad*> gamepad;
+
 	float2 getRenderTileSize() const;
 	float2 getRenderDirectionX() const;
 	float2 getRenderDirectionY() const;
@@ -554,8 +561,10 @@ private:
 	static float scoreSequence(const Settings& settings, const std::vector<BuildingType>& sequence);
 	static std::string debugRenderSequence(const std::vector<Session::BuildingType>& sequence);
 
+	float getPlayerInput();
+
 	void updateCarStats(const std::chrono::microseconds delta_time);
-	void updateCarDrive(const std::chrono::microseconds delta_time, const float mouse_delta_x);
+	void updateCarDrive(const std::chrono::microseconds delta_time, const float player_input);
 	void updateCarCollisions(const std::chrono::microseconds total_time);
 	bool isGameFinished() const;
 
@@ -663,9 +672,23 @@ Session::Session(const Settings& _settings, const Storage& _storage, const Conte
 	backgroundColor = float4(level->getBackgroundColor().r, level->getBackgroundColor().g, level->getBackgroundColor().b, level->getBackgroundColor().a) * (1.0f / 255.0f);
 	worldStartingPosition = float2(level->getProp("startX")->getValue<int>(), level->getProp("startY")->getValue<int>()) + float2(0.5f);
 	carPosition = worldStartingPosition;
+
+	if (SDL_HasGamepad()) {
+		int id_count = 0;
+		SDL_JoystickID* ids = SDL_GetGamepads(&id_count);
+		SDL_assert(id_count > 0 && ids && ids[0]);
+
+		gamepad = SDL_OpenGamepad(ids[0]);
+		SDL_assert(*gamepad);
+	}
 }
 
 Session::~Session() {
+	if (gamepad.has_value()) {
+		SDL_CloseGamepad(*gamepad);
+		gamepad.reset();
+	}
+
 	for (auto& cell : cells) {
 		SDL_DestroyTexture(cell.skidTexture);
 		cell.skidTexture = nullptr;
@@ -754,8 +777,7 @@ void Session::update(const std::chrono::microseconds real_delta_time) {
 
 	//---------- Car ----------//
 	{
-		float mouse_delta_x;
-		SDL_GetRelativeMouseState(&mouse_delta_x, nullptr);
+		const float player_input = getPlayerInput();
 
 		if (!paused) {
 			if (debug_simulation) {
@@ -771,7 +793,7 @@ void Session::update(const std::chrono::microseconds real_delta_time) {
 			if (countdownTime.count() == 0) {
 				sessionTotalTime += real_delta_time;
 				updateCarStats(real_delta_time);
-				updateCarDrive(real_delta_time, mouse_delta_x);
+				updateCarDrive(real_delta_time, player_input);
 				updateCarCollisions(sessionTotalTime);
 				cameraShaker.update(real_delta_time);
 			}
@@ -880,6 +902,46 @@ std::string Session::debugRenderSequence(const std::vector<Session::BuildingType
 	return result;
 }
 
+static float absmax(const float a, const float b) {
+	return std::abs(a) > std::abs(b) ? a : b;
+}
+
+float Session::getPlayerInput() {
+	float mouse_input = 0;
+	float keyboard_input = 0;
+	float gamepad_input = 0;
+
+	{
+		float mouse_delta_x, mouse_delta_y;
+		SDL_GetRelativeMouseState(&mouse_delta_x, &mouse_delta_y);
+		mouse_input = absmax(mouse_delta_x, mouse_delta_y) * settings.car.mouseSensibility;
+	}
+
+	{
+		int key_count = 0;
+		const bool* key_state = SDL_GetKeyboardState(&key_count);
+		if (key_state && SDL_SCANCODE_LEFT < key_count && SDL_SCANCODE_RIGHT < key_count && SDL_SCANCODE_UP < key_count && SDL_SCANCODE_DOWN < key_count) {
+			if (key_state[SDL_SCANCODE_LEFT] || key_state[SDL_SCANCODE_UP]) {
+				keyboard_input = -1.0f * settings.car.keyboardSensibility;
+			} else if (key_state[SDL_SCANCODE_RIGHT] || key_state[SDL_SCANCODE_DOWN]) {
+				keyboard_input = 1.0f * settings.car.keyboardSensibility;
+			}
+		}
+	}
+
+	if (gamepad.has_value()) {
+		constexpr Sint16 deadzone = INT16_MAX / 100 * 15;
+		const Sint16 x_axis = SDL_GetGamepadAxis(*gamepad, SDL_GAMEPAD_AXIS_LEFTX);
+		const Sint16 y_axis = SDL_GetGamepadAxis(*gamepad, SDL_GAMEPAD_AXIS_LEFTY);
+		const Sint16 axis = absmax(x_axis, y_axis);
+		if (std::abs(axis) >= std::abs(deadzone)) {
+			gamepad_input = (float(axis) / INT16_MAX) * settings.car.gamepadSensibility;
+		}
+	}
+
+	return absmax(absmax(mouse_input, keyboard_input), gamepad_input);
+}
+
 void Session::updateCarStats(const std::chrono::microseconds delta_time) {
 	carStats.speedStackedMultiplier -= settings.car.speedMultiplierDecrease * TimeUtils::microsecondsToFloatSeconds(delta_time);
 	carStats.speedStackedMultiplier = std::clamp<float>(carStats.speedStackedMultiplier, settings.car.speedMultiplierStackedRange.x, settings.car.speedMultiplierStackedRange.y);
@@ -898,14 +960,12 @@ void Session::updateCarStats(const std::chrono::microseconds delta_time) {
 	}
 }
 
-void Session::updateCarDrive(const std::chrono::microseconds delta_time, const float mouse_delta_x) {
+void Session::updateCarDrive(const std::chrono::microseconds delta_time, const float player_input) {
 	const bool prev_skid = carSkid;
 	const float2 prev_skid_position = carPrevPosition;
 
 	carPrevPosition = carPosition;
-
-	const float steer_angle = mouse_delta_x * settings.car.mouseSensibility;
-	carSteerDirection = glm::rotate(glm::normalize(carSteerDirection), steer_angle);
+	carSteerDirection = glm::rotate(glm::normalize(carSteerDirection), player_input);
 
 	const float delta_secs = TimeUtils::microsecondsToFloatSeconds(delta_time);
 	const float wanted_angle = glm::orientedAngle(carForwardDirection, carSteerDirection);
@@ -1805,7 +1865,7 @@ App::App(int argc, char* argv[]) {
 	const bool hint_ok = SDL_SetHint(SDL_HINT_ORIENTATIONS, "LandscapeLeft LandscapeRight");
 	SDL_assert(hint_ok);
 
-	bool init_ok = SDL_Init(SDL_INIT_EVENTS | SDL_INIT_VIDEO);
+	bool init_ok = SDL_Init(SDL_INIT_EVENTS | SDL_INIT_VIDEO | SDL_INIT_GAMEPAD);
 	SDL_assert(init_ok);
 
 	window = SDL_CreateWindow("Drunken Lobster Driving", 1920, 1080, SDL_WINDOW_RESIZABLE | SDL_WINDOW_MAXIMIZED | SDL_WINDOW_HIGH_PIXEL_DENSITY);
