@@ -19,7 +19,7 @@
 	"Drive": "Gioca",
 	"Exit": "Esci",
 	"Finished!": "Finito!",
-	"Free software libraries and tools used: fmt, Freetype, GLM, ImGui, Nlohmann JSON, RmlUi, SDL, Tileson, Blender, Tiled": "Software libero utilizzato: fmt, Freetype, GLM, ImGui, Nlohmann JSON, RmlUi, SDL, Tileson, Blender, Tiled",
+	"Free software libraries and tools used: ": "Software libero utilizzato: ",
 	"Game Design, Programming by ": "Game Design, Programmazione di ",
 	"Home": "Home",
 	"How to Play": "Come giocare",
