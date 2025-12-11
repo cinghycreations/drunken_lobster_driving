@@ -336,9 +336,10 @@ struct LevelRecord {
 
 struct Savegame {
 	int version = 0;
+	std::string language = "en";
 	std::vector<LevelRecord> records;
 
-	NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(Savegame, version, records);
+	NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(Savegame, version, language, records);
 };
 
 /////////////
@@ -1519,6 +1520,7 @@ Launcher::Launcher(const Settings& _settings, const Storage& _storage, Content& 
 	enumerateLevels();
 	load();
 	refreshGameMode(GameMode::Destruction);
+	translator.selectLanguage(savegame.language);
 
 	document = uiContext->LoadDocument("ui/home.html");
 	SDL_assert(document);
@@ -1758,6 +1760,9 @@ void Launcher::selectLanguage(Rml::DataModelHandle handle, Rml::Event& event, co
 
 	const std::string& language = params.at(0).GetReference<std::string>();
 	translator.selectLanguage(language);
+
+	savegame.language = language;
+	save();
 
 	deferredUpdates.emplace_back(std::bind(&Launcher::goToPage, this, "ui/home.html"));
 }
