@@ -1,0 +1,14 @@
+Drive like a Drunken Lobster and destroy everything!
+
+Controls
+
+Steer your car left and right using any of:
+- Mouse ⬅️/➡️ or ⬆️/⬇️
+- Keyboard arrow keys ⬅️/➡️ or ⬆️/⬇️
+- Gamepad left stick ⬅️/➡️ or ⬆️/⬇️
+- (Mobile) Swipe ⬅️/➡️ or ⬆️/⬇️
+
+Modes
+
+- Sequence: destroy streaks of identical buildings in a row. Increase multiplier with Skyscrapers and Nuclear plants
+- Time Attack: destroy everything in the shortest possible time
