@@ -5,6 +5,7 @@ set( CMAKE_CXX_SCAN_FOR_MODULES OFF )
 project( drunken_lobster_driving VERSION 0 )
 
 option( CC_HAS_DEVUI "Enable Dev Ui" ON )
+option( CC_HAS_HIDPI "Enable HiDPI" ON )
 option( CC_HAS_EMBED_CONTENT "Embed content in executable" OFF )
 option( CC_HAS_EXECUTABLE_AS_LIBRARY "Build a shared library instead of an executable" OFF )
 
@@ -96,6 +97,9 @@ endif()
 if ( CC_HAS_EMBED_CONTENT )
 	target_link_libraries( drunken_lobster_driving PUBLIC content )
 	target_compile_definitions( drunken_lobster_driving PUBLIC CC_HAS_EMBED_CONTENT )
+endif()
+if ( CC_HAS_HIDPI )
+	target_compile_definitions( drunken_lobster_driving PUBLIC CC_HAS_HIDPI )
 endif()
 
 if ( "${CMAKE_SYSTEM_NAME}" STREQUAL "Android" )

@@ -1878,8 +1878,11 @@ App::App(int argc, char* argv[]) {
 	bool init_ok = SDL_Init(SDL_INIT_EVENTS | SDL_INIT_VIDEO | SDL_INIT_GAMEPAD);
 	SDL_assert(init_ok);
 
-	// FIXME Disable HiDPI on Html5, because mouse coordinates are off
-	window = SDL_CreateWindow("Drunken Lobster Driving", 1920, 1080, SDL_WINDOW_RESIZABLE | SDL_WINDOW_MAXIMIZED | SDL_WINDOW_HIGH_PIXEL_DENSITY);
+	SDL_WindowFlags window_flags = SDL_WINDOW_RESIZABLE | SDL_WINDOW_MAXIMIZED;
+#ifdef CC_HAS_HIDPI
+	window_flags |= SDL_WINDOW_HIGH_PIXEL_DENSITY;
+#endif
+	window = SDL_CreateWindow("Drunken Lobster Driving", 1280, 720, window_flags);
 	SDL_assert(window);
 
 	renderer = SDL_CreateRenderer(window, nullptr);
