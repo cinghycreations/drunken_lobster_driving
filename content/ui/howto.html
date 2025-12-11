@@ -19,7 +19,7 @@
         }
 
         p {
-            margin: 1rem 0rem;
+            /* margin: 1rem 0rem; */
             text-align: center;
         }
 
@@ -28,27 +28,28 @@
             margin: 0rem;
             padding: 0rem;
         }
+
+        p.title {
+            margin: 1rem 0rem;
+            font-size: 1.5rem;
+        }
     </style>
 </head>
 
 <body data-model="launcher">
     <panel>
         <p>Drive like a drunken lobster and destroy everything!</p>
-        <p>
-            Sequence Mode: increase your score by destroying streaks of identical buildings like
-            <img src="/buildings/garden0000.png" />
-            <img src="/buildings/garden0000.png" />
-            <img src="/buildings/garden0000.png" />
-            or
-            <img src="/buildings/gaspump0000.png" />
-            <img src="/buildings/gaspump0000.png" />
-            <img src="/buildings/gaspump0000.png" />
-            <img src="/buildings/gaspump0000.png" />
-            in a short time. Skyscrapers <img src="/buildings/skyscraper0000.png" />
-            give a 2x multiplier while Nuclear plants <img src="/buildings/nuclear0000.png" />
-            a 5x multiplier
-        </p>
-        <p>Time Attack Mode: destroy all buildings in the shortest time possible</p>
+        <p class="title">Sequence Mode</p>
+        <p>Destroy streaks of identical buildings in a short time, for example:<img
+                src="/buildings/garden0000.png" /><img src="/buildings/garden0000.png" /><img
+                src="/buildings/garden0000.png" />or<img src="/buildings/gaspump0000.png" /><img
+                src="/buildings/gaspump0000.png" /><img src="/buildings/gaspump0000.png" /><img
+                src="/buildings/gaspump0000.png" /></p>
+        <p>Destroy Skyscrapers for a 2x multiplier and Nuclear plants for a 5x multiplier:<img
+                src="/buildings/skyscraper0000.png" /><img src="/buildings/nuclear0000.png" /></p>
+        <p class="title">Time Attack Mode</p>
+        <p>Destroy all buildings in the shortest time possible</p>
+        <p class="title"></p>
         <button data-event-click="goToHome()">Back</button>
     </panel>
 </body>
