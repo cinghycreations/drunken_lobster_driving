@@ -9,6 +9,7 @@
 - [x] Simplify build versioning
 - [x] Add Lobster model to car and background
 - [x] Screenshots, GIFs and other marketing materials for Itch
+- [ ] Html5 build for Itch
 - [ ] Set proper target scores and times for levels
 - [ ] Everything related to sound and music.
 - [ ] Screenshots, GIFs and other marketing materials for Google Play

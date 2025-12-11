@@ -37,26 +37,24 @@
             }
         },
         {
-            "name": "emscripten-dev",
+            "name": "html5-dev",
             "generator": "Ninja Multi-Config",
             "binaryDir": "${sourceDir}/temp/build/${presetName}",
             "installDir": "${sourceDir}/temp/install/${presetName}",
             "toolchainFile": "$env{EMSDK_HOME}/upstream/emscripten/cmake/Modules/Platform/Emscripten.cmake",
             "cacheVariables": {
-                "CC_HAS_EMBED_CONTENT": "ON",
-                "CMAKE_EXECUTABLE_SUFFIX_CXX": ".html"
+                "CC_HAS_EMBED_CONTENT": "ON"
             }
         },
         {
-            "name": "emscripten-release",
+            "name": "html5-release",
             "generator": "Ninja Multi-Config",
             "binaryDir": "${sourceDir}/temp/build/${presetName}",
             "installDir": "${sourceDir}/temp/install/${presetName}",
             "toolchainFile": "$env{EMSDK_HOME}/upstream/emscripten/cmake/Modules/Platform/Emscripten.cmake",
             "cacheVariables": {
                 "CC_HAS_DEVUI": "OFF",
-                "CC_HAS_EMBED_CONTENT": "ON",
-                "CMAKE_EXECUTABLE_SUFFIX_CXX": ".html"
+                "CC_HAS_EMBED_CONTENT": "ON"
             }
         },
         {
@@ -107,13 +105,13 @@
             "configuration": "Release"
         },
         {
-            "name": "emscripten-dev",
-            "configurePreset": "emscripten-dev",
+            "name": "html5-dev",
+            "configurePreset": "html5-dev",
             "configuration": "Debug"
         },
         {
-            "name": "emscripten-release",
-            "configurePreset": "emscripten-release",
+            "name": "html5-release",
+            "configurePreset": "html5-release",
             "configuration": "Release"
         },
         {

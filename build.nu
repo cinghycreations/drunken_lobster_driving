@@ -33,6 +33,17 @@ def 'main build windows' [version: string] {
     cmake --build --preset windows-release --target install
 }
 
+def 'main build html5' [version: string] {
+    let build_number = get_build_number
+    let release_version = get_release_version $version $build_number
+
+    cmake --preset html5-dev -D CMAKE_PROJECT_VERSION=$'($release_version)'
+    cmake --build --preset html5-dev --target install
+
+    cmake --preset html5-release -D CMAKE_PROJECT_VERSION=$'($release_version)'
+    cmake --build --preset html5-release --target install
+}
+
 def 'main upload windows' [version: string] {
     let build_number = get_build_number
     let release_version = get_release_version $version $build_number
@@ -47,14 +58,23 @@ def 'main upload android' [version: string] {
     temp/butler-windows-amd64/butler.exe push temp/install/android-release/drunken_lobster_driving-release.apk cinghycreations/drunken-lobster-driving:android --userversion $release_version
 }
 
+def 'main upload html5' [version: string] {
+    let build_number = get_build_number
+    let release_version = get_release_version $version $build_number
+
+    temp/butler-windows-amd64/butler.exe push temp/install/html5-release cinghycreations/drunken-lobster-driving:html5 --userversion $release_version
+}
+
 def 'main build' [version: string] {
     main build windows $version
     main build android $version
+    main build html5 $version
 }
 
 def 'main upload' [version: string] {
     main upload windows $version
     main upload android $version
+    main upload html5 $version
 }
 
 def 'main' [version: string] {
