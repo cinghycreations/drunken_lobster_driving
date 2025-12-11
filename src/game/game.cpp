@@ -218,15 +218,22 @@ struct GameplaySettings {
 												gaspump, skyscraper, nuclear);
 };
 
+struct SystemSettings {
+	bool updateTranslations = false;
+
+	NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(SystemSettings, updateTranslations);
+};
+
 struct Settings {
 	RenderSettings render;
 	CameraSettings camera;
 	CarSettings car;
 	GameplaySettings gameplay;
+	SystemSettings system;
 
 	void update(const Storage& storage);
 
-	NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(Settings, render, camera, car, gameplay);
+	NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(Settings, render, camera, car, gameplay, system);
 };
 
 void Settings::update(const Storage& storage) {
@@ -306,7 +313,12 @@ void Settings::update(const Storage& storage) {
 				ImGui::PopID();
 			}
 		}
+
+		if (ImGui::CollapsingHeader("System", ImGuiTreeNodeFlags_DefaultOpen)) {
+			ImGui::Checkbox("Update Translations", &system.updateTranslations);
+		}
 	}
+
 	ImGui::End();
 #endif
 }
@@ -1281,6 +1293,55 @@ const std::string& Session::getTimeRank(const Settings& settings, const float ti
 // Launcher //
 //////////////
 
+class Translator {
+public:
+	Translator(const Settings& _settings, Storage& _storage) : settings(_settings), storage(_storage) {}
+
+	void selectLanguage(const std::string_view language);
+	bool translate(const std::string_view input, std::string_view& output);
+
+	static std::filesystem::path getTranslationPath(const std::string_view language);
+
+private:
+	const Settings& settings;
+	Storage& storage;
+
+	std::string currentLanguage = "en";
+	nlohmann::json translation;
+};
+
+void Translator::selectLanguage(const std::string_view language) {
+	const std::filesystem::path translation_path = getTranslationPath(language);
+	if (storage.exists(translation_path)) {
+		translation = storage.loadJson(translation_path);
+	} else {
+		translation = nlohmann::json::object();
+	}
+	currentLanguage = language;
+}
+
+bool Translator::translate(const std::string_view input, std::string_view& output) {
+	if (translation.count(input)) {
+		output = translation.at(input).get<std::string_view>();
+		return true;
+	} else {
+		if (settings.system.updateTranslations) {
+			translation["@@locale"] = currentLanguage;
+			translation[input] = input;
+
+			const std::filesystem::path translation_path = getTranslationPath(currentLanguage);
+			storage.saveJson(translation_path, translation);
+		}
+
+		output = input;
+		return false;
+	}
+}
+
+std::filesystem::path Translator::getTranslationPath(const std::string_view language) {
+	return std::filesystem::path("localization") / fmt::format("{}.json", language);
+}
+
 class StorageFileInterface : public Rml::FileInterface {
 public:
 	Storage& storage;
@@ -1324,7 +1385,8 @@ size_t StorageFileInterface::Tell(Rml::FileHandle handle) {
 
 class Launcher {
 public:
-	Launcher(const Settings& _settings, const Storage& _storage, Content& _content, SDL_Window* _window, SDL_Renderer* _renderer, Rml::Context* ui_context);
+	Launcher(const Settings& _settings, const Storage& _storage, Content& _content, SDL_Window* _window, SDL_Renderer* _renderer, Translator& _translator,
+			 Rml::Context* ui_context);
 	~Launcher();
 
 	float4 getBackgroundColor() const;
@@ -1350,6 +1412,7 @@ private:
 	SDL_Window* window;
 	SDL_Renderer* renderer;
 
+	Translator& translator;
 	Rml::Context* uiContext;
 	Rml::DataModelHandle launcherModel;
 	Rml::DataModelHandle sessionModel;
@@ -1411,8 +1474,9 @@ private:
 	static std::string renderSequence(const std::vector<Session::BuildingType>& sequence);
 };
 
-Launcher::Launcher(const Settings& _settings, const Storage& _storage, Content& _content, SDL_Window* _window, SDL_Renderer* _renderer, Rml::Context* ui_context)
-	: settings(_settings), storage(_storage), content(_content), window(_window), renderer(_renderer), uiContext(ui_context) {
+Launcher::Launcher(const Settings& _settings, const Storage& _storage, Content& _content, SDL_Window* _window, SDL_Renderer* _renderer, Translator& _translator,
+				   Rml::Context* ui_context)
+	: settings(_settings), storage(_storage), content(_content), window(_window), renderer(_renderer), translator(_translator), uiContext(ui_context) {
 
 	buildVersion = fmt::format("v{}", CC_BUILD_VERSION);
 
@@ -1693,7 +1757,7 @@ void Launcher::selectLanguage(Rml::DataModelHandle handle, Rml::Event& event, co
 	SDL_assert(params.at(0).GetType() == Rml::Variant::STRING);
 
 	const std::string& language = params.at(0).GetReference<std::string>();
-	SDL_assert(language == "it" || language == "en" || language == "es");
+	translator.selectLanguage(language);
 }
 
 void Launcher::goToHowToPlay(Rml::DataModelHandle handle, Rml::Event& event, const Rml::VariantList& params) {
@@ -1844,6 +1908,27 @@ std::string Launcher::renderSequence(const std::vector<Session::BuildingType>& s
 // App //
 /////////
 
+class SystemInterface : public SystemInterface_SDL {
+public:
+	SystemInterface(Translator& _translator) : translator(_translator) {}
+
+	int TranslateString(Rml::String& translated, const Rml::String& input) override;
+
+private:
+	Translator& translator;
+};
+
+int SystemInterface::TranslateString(Rml::String& translated, const Rml::String& input) {
+	std::string_view translated_view;
+	if (translator.translate(input, translated_view)) {
+		translated = translated_view;
+		return 1;
+	} else {
+		translated = input;
+		return 0;
+	}
+}
+
 class App {
 public:
 	App(int argc, char* argv[]);
@@ -1857,8 +1942,9 @@ private:
 	SDL_Renderer* renderer = nullptr;
 	std::unique_ptr<Storage> storage;
 	Settings settings;
+	std::unique_ptr<Translator> translator;
 	std::unique_ptr<StorageFileInterface> uiStorage;
-	std::unique_ptr<SystemInterface_SDL> uiSystem;
+	std::unique_ptr<SystemInterface> uiSystem;
 	std::unique_ptr<RenderInterface_SDL> uiRenderer;
 	Rml::Context* uiContext;
 	std::unique_ptr<Content> content;
@@ -1924,8 +2010,9 @@ App::App(int argc, char* argv[]) {
 	}
 
 	{
+		translator.reset(new Translator(settings, *storage));
 		uiStorage.reset(new StorageFileInterface(*storage));
-		uiSystem.reset(new SystemInterface_SDL);
+		uiSystem.reset(new SystemInterface(*translator));
 		uiRenderer.reset(new RenderInterface_SDL(renderer));
 		Rml::SetFileInterface(uiStorage.get());
 		Rml::SetSystemInterface(uiSystem.get());
@@ -1950,7 +2037,7 @@ App::App(int argc, char* argv[]) {
 	}
 
 	content.reset(new Content(*storage, renderer));
-	launcher.reset(new Launcher(settings, *storage, *content, window, renderer, uiContext));
+	launcher.reset(new Launcher(settings, *storage, *content, window, renderer, *translator, uiContext));
 	realTotalTime = std::chrono::microseconds(SDL_GetTicksNS() / 1000);
 }
 
