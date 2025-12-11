@@ -1758,6 +1758,8 @@ void Launcher::selectLanguage(Rml::DataModelHandle handle, Rml::Event& event, co
 
 	const std::string& language = params.at(0).GetReference<std::string>();
 	translator.selectLanguage(language);
+
+	deferredUpdates.emplace_back(std::bind(&Launcher::goToPage, this, "ui/home.html"));
 }
 
 void Launcher::goToHowToPlay(Rml::DataModelHandle handle, Rml::Event& event, const Rml::VariantList& params) {
