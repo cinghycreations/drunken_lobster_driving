@@ -54,7 +54,7 @@
         {
          "name":"name",
          "type":"string",
-         "value":"Friendly Neighbours"
+         "value":"Neighbourhood"
         }, 
         {
          "name":"startX",
@@ -250,7 +250,7 @@
          "margin":0,
          "name":"ground",
          "spacing":0,
-         "tilecount":44,
+         "tilecount":48,
          "tileheight":512,
          "tiles":[
                 {
