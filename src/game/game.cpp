@@ -563,7 +563,7 @@ private:
 	static float scoreSequence(const Settings& settings, const std::vector<BuildingType>& sequence);
 	static std::string debugRenderSequence(const std::vector<Session::BuildingType>& sequence);
 
-	float getPlayerInput();
+	float getPlayerInput(const std::chrono::microseconds delta_time);
 
 	void updateCarStats(const std::chrono::microseconds delta_time);
 	void updateCarDrive(const std::chrono::microseconds delta_time, const float player_input);
@@ -779,7 +779,7 @@ void Session::update(const std::chrono::microseconds real_delta_time) {
 
 	//---------- Car ----------//
 	{
-		const float player_input = getPlayerInput();
+		const float player_input = getPlayerInput(real_delta_time);
 
 		if (!paused) {
 			if (debug_simulation) {
@@ -908,7 +908,7 @@ static float absmax(const float a, const float b) {
 	return std::abs(a) > std::abs(b) ? a : b;
 }
 
-float Session::getPlayerInput() {
+float Session::getPlayerInput(const std::chrono::microseconds delta_time) {
 	float mouse_input = 0;
 	float keyboard_input = 0;
 	float gamepad_input = 0;
@@ -919,16 +919,14 @@ float Session::getPlayerInput() {
 		mouse_input = absmax(mouse_delta_x, mouse_delta_y) * settings.car.mouseSensibility;
 	}
 
-	// FIXME Keyboard and Gamepad inputs should be dependent on delta time
-
 	{
 		int key_count = 0;
 		const bool* key_state = SDL_GetKeyboardState(&key_count);
 		if (key_state && SDL_SCANCODE_LEFT < key_count && SDL_SCANCODE_RIGHT < key_count && SDL_SCANCODE_UP < key_count && SDL_SCANCODE_DOWN < key_count) {
 			if (key_state[SDL_SCANCODE_LEFT] || key_state[SDL_SCANCODE_UP]) {
-				keyboard_input = -1.0f * settings.car.keyboardSensibility;
+				keyboard_input = -1.0f * settings.car.keyboardSensibility * TimeUtils::microsecondsToFloatSeconds(delta_time);
 			} else if (key_state[SDL_SCANCODE_RIGHT] || key_state[SDL_SCANCODE_DOWN]) {
-				keyboard_input = 1.0f * settings.car.keyboardSensibility;
+				keyboard_input = 1.0f * settings.car.keyboardSensibility * TimeUtils::microsecondsToFloatSeconds(delta_time);
 			}
 		}
 	}
@@ -939,7 +937,7 @@ float Session::getPlayerInput() {
 		const Sint16 y_axis = SDL_GetGamepadAxis(*gamepad, SDL_GAMEPAD_AXIS_LEFTY);
 		const Sint16 axis = absmax(x_axis, y_axis);
 		if (std::abs(axis) >= std::abs(deadzone)) {
-			gamepad_input = (float(axis) / INT16_MAX) * settings.car.gamepadSensibility;
+			gamepad_input = (float(axis) / INT16_MAX) * settings.car.gamepadSensibility * TimeUtils::microsecondsToFloatSeconds(delta_time);
 		}
 	}
 

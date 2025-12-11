@@ -22,9 +22,9 @@
 	},
 	"car": {
 		"baseSpeed": 1.5,
-		"gamepadSensibility": 0.019999999552965164,
+		"gamepadSensibility": 5.0,
 		"grip": 0.4000000059604645,
-		"keyboardSensibility": 0.019999999552965164,
+		"keyboardSensibility": 5.0,
 		"mouseSensibility": 0.007499999832361937,
 		"size": 0.4000000059604645,
 		"speedMultiplierDecrease": 1.0,
