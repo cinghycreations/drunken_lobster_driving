@@ -1534,9 +1534,11 @@ void Launcher::load() {
 		const Savegame loaded_savegame = json;
 		if (loaded_savegame.version == expectedSavegameVersion) {
 			savegame = loaded_savegame;
+		} else {
+			savegame = Savegame{.version = expectedSavegameVersion};
 		}
 	} else {
-		savegame = Savegame{};
+		savegame = Savegame{.version = expectedSavegameVersion};
 	}
 
 	const bool close_ok = SDL_CloseStorage(storage);
