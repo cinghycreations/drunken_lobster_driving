@@ -919,6 +919,8 @@ float Session::getPlayerInput() {
 		mouse_input = absmax(mouse_delta_x, mouse_delta_y) * settings.car.mouseSensibility;
 	}
 
+	// FIXME Keyboard and Gamepad inputs should be dependent on delta time
+
 	{
 		int key_count = 0;
 		const bool* key_state = SDL_GetKeyboardState(&key_count);
@@ -1876,6 +1878,7 @@ App::App(int argc, char* argv[]) {
 	bool init_ok = SDL_Init(SDL_INIT_EVENTS | SDL_INIT_VIDEO | SDL_INIT_GAMEPAD);
 	SDL_assert(init_ok);
 
+	// FIXME Disable HiDPI on Html5, because mouse coordinates are off
 	window = SDL_CreateWindow("Drunken Lobster Driving", 1920, 1080, SDL_WINDOW_RESIZABLE | SDL_WINDOW_MAXIMIZED | SDL_WINDOW_HIGH_PIXEL_DENSITY);
 	SDL_assert(window);
 
