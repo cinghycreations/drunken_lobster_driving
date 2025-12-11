@@ -1791,6 +1791,7 @@ void Launcher::renderBackground() {
 		for (int j = 0; j < tiles_x + 1; ++j) {
 			const int texture_index = (i + j) % content.backgroundFlipbook.textures.size();
 			SDL_Texture* texture = content.backgroundFlipbook.textures.at(texture_index);
+			SDL_assert(texture->w == texture->h);
 
 			const SDL_FRect dest_rect{
 				.x = displacement_x + (j - 1) * tile_size,
@@ -1799,7 +1800,7 @@ void Launcher::renderBackground() {
 				.h = tile_size,
 			};
 
-			const bool render_texture_ok = SDL_RenderTextureTiled(renderer, texture, nullptr, 1, &dest_rect);
+			const bool render_texture_ok = SDL_RenderTextureTiled(renderer, texture, nullptr, tile_size / float(texture->w), &dest_rect);
 			SDL_assert(render_texture_ok);
 		}
 	}
