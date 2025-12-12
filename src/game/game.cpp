@@ -88,6 +88,9 @@ public:
 
 	nlohmann::json loadJson(const std::filesystem::path& path) const;
 	void saveJson(const std::filesystem::path& path, const nlohmann::json& json) const;
+
+private:
+	static std::string normalizePath(const std::filesystem::path& path);
 };
 
 #ifdef CC_HAS_EMBED_CONTENT
@@ -96,11 +99,11 @@ cmrc::embedded_filesystem get_filesystem();
 } // namespace cmrc::content
 
 bool Storage::exists(const std::filesystem::path& path) const {
-	return cmrc::content::get_filesystem().exists(path.string());
+	return cmrc::content::get_filesystem().exists(normalizePath(path));
 }
 
 SDL_IOStream* Storage::open(const std::filesystem::path& path) const {
-	cmrc::file file = cmrc::content::get_filesystem().open(path.string());
+	cmrc::file file = cmrc::content::get_filesystem().open(normalizePath(path));
 	return SDL_IOFromConstMem(file.begin(), file.size());
 }
 #else
@@ -112,6 +115,12 @@ SDL_IOStream* Storage::open(const std::filesystem::path& path) const {
 	return SDL_IOFromFile(path.string().c_str(), "rb");
 }
 #endif
+
+std::string Storage::normalizePath(const std::filesystem::path& path) {
+	std::string norm_path = path.lexically_normal().string();
+	std::transform(norm_path.begin(), norm_path.end(), norm_path.begin(), [](const char c) { return c == '\\' ? '/' : c; });
+	return norm_path;
+}
 
 nlohmann::json Storage::loadJson(const std::filesystem::path& path) const {
 	SDL_IOStream* stream = open(path);
