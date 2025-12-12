@@ -1,11 +1,11 @@
-def get_build_number [] { git rev-list --count master | into int }
-def get_release_version [version: string, build_number : int ] { $'($version).($build_number)' }
+export def 'get_build_number' [] { git rev-list --count master | into int }
+export def 'get_release_version' [version: string, build_number : int ] { $'($version).($build_number)' }
 
-def 'main clean' [] {
+export def clean [] {
     rm --recursive --force temp/build temp/install android-project/.gradle android-project/build android-project/drunken_lobster_driving/build
 }
 
-def 'main build android' [version: string] {
+export def 'build android' [version: string] {
     let build_number = get_build_number
     let release_version = get_release_version $version $build_number
 
@@ -22,7 +22,7 @@ def 'main build android' [version: string] {
     cmake --build --preset android-release --target install
 }
 
-def 'main build windows' [version: string] {
+export def 'build windows' [version: string] {
     let build_number = get_build_number
     let release_version = get_release_version $version $build_number
 
@@ -33,7 +33,7 @@ def 'main build windows' [version: string] {
     cmake --build --preset windows-release --target install
 }
 
-def 'main build html5' [version: string] {
+export def 'build html5' [version: string] {
     let build_number = get_build_number
     let release_version = get_release_version $version $build_number
 
@@ -44,41 +44,49 @@ def 'main build html5' [version: string] {
     cmake --build --preset html5-release --target install
 }
 
-def 'main upload windows' [version: string] {
+export def 'upload windows' [version: string] {
     let build_number = get_build_number
     let release_version = get_release_version $version $build_number
 
-    temp/butler-windows-amd64/butler.exe push temp/install/windows-release cinghycreations/drunken-lobster-driving:windows --userversion $release_version
+    temp/butler-windows-amd64/butler.exe push temp/install/windows-release cinghycreations/drunken-main-driving:windows --userversion $release_version
 }
 
-def 'main upload android' [version: string] {
+export def 'upload android' [version: string] {
     let build_number = get_build_number
     let release_version = get_release_version $version $build_number
 
-    temp/butler-windows-amd64/butler.exe push temp/install/android-release/drunken_lobster_driving-release.apk cinghycreations/drunken-lobster-driving:android --userversion $release_version
+    temp/butler-windows-amd64/butler.exe push temp/install/android-release/drunken_lobster_driving-release.apk cinghycreations/drunken-main-driving:android --userversion $release_version
 }
 
-def 'main upload html5' [version: string] {
+export def 'upload html5' [version: string] {
     let build_number = get_build_number
     let release_version = get_release_version $version $build_number
 
-    temp/butler-windows-amd64/butler.exe push temp/install/html5-release cinghycreations/drunken-lobster-driving:html5 --userversion $release_version
+    temp/butler-windows-amd64/butler.exe push temp/install/html5-release cinghycreations/drunken-main-driving:html5 --userversion $release_version
 }
 
-def 'main build' [version: string] {
-    main build windows $version
-    main build android $version
-    main build html5 $version
+export def build [version: string] {
+    build windows $version
+    build android $version
+    build html5 $version
 }
 
-def 'main upload' [version: string] {
-    main upload windows $version
-    main upload android $version
-    main upload html5 $version
+export def upload [version: string] {
+    upload windows $version
+    upload android $version
+    upload html5 $version
 }
 
-def 'main' [version: string] {
-    main clean
-    main build $version
-    main upload $version
+export def tag [version: string] {
+    let build_number = get_build_number
+    let release_version = get_release_version $version $build_number
+
+    git tag -f $release_version    
+}
+
+export def release [version: string] {
+    clean
+    build $version
+    upload $version
+    tag $version
 }
