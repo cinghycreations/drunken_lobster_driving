@@ -56,7 +56,7 @@ export def 'upload windows' [version: string]: nothing -> nothing {
     let build_number = get-build-number
     let release_version = get-release-version $version $build_number
 
-    temp/butler-windows-amd64/butler.exe push temp/install/windows-release cinghycreations/drunken-main-driving:windows --userversion $release_version
+    temp/butler-windows-amd64/butler.exe push temp/install/windows-release cinghycreations/drunken-lobster-driving:windows --userversion $release_version
 }
 
 # Upload the Android build to Itch
@@ -64,7 +64,7 @@ export def 'upload android' [version: string]: nothing -> nothing {
     let build_number = get-build-number
     let release_version = get-release-version $version $build_number
 
-    temp/butler-windows-amd64/butler.exe push temp/install/android-release/drunken_lobster_driving-release.apk cinghycreations/drunken-main-driving:android --userversion $release_version
+    temp/butler-windows-amd64/butler.exe push temp/install/android-release/drunken_lobster_driving-release.apk cinghycreations/drunken-lobster-driving:android --userversion $release_version
 }
 
 # Upload the HTML5 build to Itch
@@ -72,7 +72,7 @@ export def 'upload html5' [version: string]: nothing -> nothing {
     let build_number = get-build-number
     let release_version = get-release-version $version $build_number
 
-    temp/butler-windows-amd64/butler.exe push temp/install/html5-release cinghycreations/drunken-main-driving:html5 --userversion $release_version
+    temp/butler-windows-amd64/butler.exe push temp/install/html5-release cinghycreations/drunken-lobster-driving:html5 --userversion $release_version
 }
 
 # Build the game for all platforms
