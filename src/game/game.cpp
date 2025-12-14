@@ -1279,24 +1279,46 @@ void Session::renderGrid() {
 	}
 }
 
+// TODO: unit tests for scoring functions
+
 const std::string& Session::getScoreRank(const Settings& settings, const float score, const float target_score) {
 	SDL_assert(target_score > 0);
-	SDL_assert(settings.gameplay.ranks.size() > 0);
+	SDL_assert(settings.gameplay.ranks.size() == 5);
 
-	int rank = int((score / target_score) * settings.gameplay.ranks.size());
-	rank = std::clamp<int>(rank, 0, settings.gameplay.ranks.size() - 1);
+	if (score >= target_score) {
+		return settings.gameplay.ranks.at(4);
+	}
 
-	return settings.gameplay.ranks.at(rank);
+	const float ratio = score / target_score;
+	if (ratio < 0.25f) {
+		return settings.gameplay.ranks.at(0);
+	} else if (ratio >= 0.25f && ratio < 0.5f) {
+		return settings.gameplay.ranks.at(1);
+	} else if (ratio >= 0.5f && ratio < 0.75f) {
+		return settings.gameplay.ranks.at(2);
+	} else {
+		return settings.gameplay.ranks.at(3);
+	}
 }
 
 const std::string& Session::getTimeRank(const Settings& settings, const float time, const float target_time) {
 	SDL_assert(target_time > 0);
-	SDL_assert(settings.gameplay.ranks.size() > 0);
+	SDL_assert(settings.gameplay.ranks.size() == 5);
 
-	int rank = int(((target_time * 2 - time) / target_time) * settings.gameplay.ranks.size());
-	rank = std::clamp<int>(rank, 0, settings.gameplay.ranks.size() - 1);
+	if (time <= target_time) {
+		return settings.gameplay.ranks.at(4);
+	}
 
-	return settings.gameplay.ranks.at(rank);
+	const float ratio = time / target_time;
+	if (ratio > 1.75f) {
+		return settings.gameplay.ranks.at(0);
+	} else if (ratio <= 1.75f && ratio > 1.5f) {
+		return settings.gameplay.ranks.at(1);
+	} else if (ratio <= 1.5f && ratio > 1.25f) {
+		return settings.gameplay.ranks.at(2);
+	} else {
+		return settings.gameplay.ranks.at(3);
+	}
 }
 
 //////////////
