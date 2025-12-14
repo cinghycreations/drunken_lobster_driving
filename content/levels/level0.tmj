@@ -82,7 +82,7 @@
         {
          "name":"targetTime",
          "type":"float",
-         "value":60
+         "value":19.3
         }],
  "renderorder":"right-down",
  "tiledversion":"1.11.2",

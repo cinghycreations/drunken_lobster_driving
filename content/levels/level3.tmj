@@ -70,7 +70,7 @@
         {
          "name":"targetTime",
          "type":"float",
-         "value":60
+         "value":18.3
         }],
  "renderorder":"right-down",
  "tiledversion":"1.11.2",
@@ -246,7 +246,7 @@
          "margin":0,
          "name":"ground",
          "spacing":0,
-         "tilecount":44,
+         "tilecount":48,
          "tileheight":512,
          "tiles":[
                 {
