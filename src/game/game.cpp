@@ -424,6 +424,9 @@ Content::Content(Storage& _storage, SDL_Renderer* renderer)
 // Session //
 /////////////
 
+// FIXME Camera continues to shake if the game is restarted while shaking
+// FIXME Set share params to basic values, as excessive shake can lead to sickness
+
 class CameraShaker {
 public:
 	void shake(const float _duration, const float _period, const float _strength);
@@ -1035,6 +1038,8 @@ void Session::updateCarDrive(const std::chrono::microseconds delta_time, const f
 }
 
 void Session::updateCarCollisions(const std::chrono::microseconds total_time) {
+	// FIXME Car still misses to destroy some buildings sometimes
+
 	const int2 prev_tile = glm::floor(carPrevPosition);
 	const int2 curr_tile = glm::floor(carPosition);
 	if (prev_tile == curr_tile) {
