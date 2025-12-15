@@ -801,25 +801,26 @@ void Session::update(const std::chrono::microseconds real_delta_time) {
 
 	//---------- Car ----------//
 	{
-		const float player_input = getPlayerInput(real_delta_time);
+		const std::chrono::microseconds capped_delta_time = std::min(real_delta_time, std::chrono::microseconds(1000000 / 30));
+		const float player_input = getPlayerInput(capped_delta_time);
 
 		if (!paused) {
 			if (debug_simulation) {
 				SDL_TriggerBreakpoint();
 			}
 
-			if (real_delta_time >= countdownTime) {
+			if (capped_delta_time >= countdownTime) {
 				countdownTime = std::chrono::microseconds(0);
 			} else {
-				countdownTime -= real_delta_time;
+				countdownTime -= capped_delta_time;
 			}
 
 			if (countdownTime.count() == 0) {
-				sessionTotalTime += real_delta_time;
-				updateCarStats(real_delta_time);
-				updateCarDrive(real_delta_time, player_input);
+				sessionTotalTime += capped_delta_time;
+				updateCarStats(capped_delta_time);
+				updateCarDrive(capped_delta_time, player_input);
 				updateCarCollisions(sessionTotalTime);
-				cameraShaker.update(real_delta_time);
+				cameraShaker.update(capped_delta_time);
 			}
 		}
 	}
