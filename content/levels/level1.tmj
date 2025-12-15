@@ -68,8 +68,8 @@
         }, 
         {
          "name":"targetScore",
-         "type":"float",
-         "value":10000
+         "type":"int",
+         "value":966
         }, 
         {
          "name":"targetTime",
