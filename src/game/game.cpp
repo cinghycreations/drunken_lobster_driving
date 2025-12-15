@@ -424,13 +424,14 @@ Content::Content(Storage& _storage, SDL_Renderer* renderer)
 // Session //
 /////////////
 
-// FIXME Camera continues to shake if the game is restarted while shaking
 // FIXME Set share params to basic values, as excessive shake can lead to sickness
 
 class CameraShaker {
 public:
 	void shake(const float _duration, const float _period, const float _strength);
 	void update(const std::chrono::microseconds& delta_time);
+
+	void reset();
 
 	float2 getMovement() const {
 		return movement;
@@ -470,6 +471,14 @@ void CameraShaker::update(const std::chrono::microseconds& delta_time) {
 float2 CameraShaker::shakeSinusoidal(const float time, const float period) {
 	const float angle = (time / period) * std::numbers::pi * 2;
 	return float2(std::sin(angle), std::cos(angle));
+}
+
+void CameraShaker::reset() {
+	maxDuration = std::chrono::microseconds(0);
+	durationLeft = std::chrono::microseconds(0);
+	period = 1;
+	strength = 0;
+	movement = float2{0};
 }
 
 class Session {
@@ -1144,6 +1153,7 @@ void Session::restart() {
 	sequence.clear();
 	sequenceTimeLeft = std::chrono::microseconds(0);
 	sequences.clear();
+	cameraShaker.reset();
 	paused = false;
 }
 
