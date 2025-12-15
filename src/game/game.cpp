@@ -337,10 +337,10 @@ void Settings::update(const Storage& storage) {
 //////////////
 
 struct LevelRecord {
-	float score1 = -1;
+	int score1 = -1;
 	float time = -1;
 
-	float& score() {
+	int& score() {
 		return score1;
 	}
 
@@ -539,7 +539,7 @@ public:
 		return sequence;
 	}
 
-	static const std::string& getScoreRank(const Settings& settings, const float score, const float target_score);
+	static const std::string& getScoreRank(const Settings& settings, const int score, const int target_score);
 	static const std::string& getTimeRank(const Settings& settings, const float time, const float target_time);
 
 private:
@@ -1286,7 +1286,7 @@ void Session::renderGrid() {
 
 // TODO Unit tests for scoring functions
 
-const std::string& Session::getScoreRank(const Settings& settings, const float score, const float target_score) {
+const std::string& Session::getScoreRank(const Settings& settings, const int score, const int target_score) {
 	SDL_assert(target_score > 0);
 	SDL_assert(settings.gameplay.ranks.size() == 5);
 
@@ -1294,7 +1294,7 @@ const std::string& Session::getScoreRank(const Settings& settings, const float s
 		return settings.gameplay.ranks.at(4);
 	}
 
-	const float ratio = score / target_score;
+	const float ratio = float(score) / float(target_score);
 	if (ratio < 0.25f) {
 		return settings.gameplay.ranks.at(0);
 	} else if (ratio >= 0.25f && ratio < 0.5f) {
@@ -1465,7 +1465,7 @@ private:
 	int countdown = 0;
 	std::string finishedRank;
 
-	std::vector<float> levelTargetScores;
+	std::vector<int> levelTargetScores;
 	std::vector<float> levelTargetTimes;
 	Savegame savegame;
 
@@ -1590,11 +1590,11 @@ void Launcher::enumerateLevels() {
 			SDL_assert(level->getProp("targetTime"));
 
 			levelNames.push_back(level->getProp("name")->getValue<std::string>());
-			levelTargetScores.push_back(level->getProp("targetScore")->getValue<float>());
+			levelTargetScores.push_back(level->getProp("targetScore")->getValue<int>());
 			levelTargetTimes.push_back(level->getProp("targetTime")->getValue<float>());
 		} else {
 			levelNames.push_back("<none>");
-			levelTargetScores.push_back(FLT_MAX);
+			levelTargetScores.push_back(INT_MAX);
 			levelTargetTimes.push_back(FLT_MAX);
 		}
 	}
@@ -1652,7 +1652,7 @@ void Launcher::refreshGameMode(const GameMode game_mode) {
 
 		for (int level_index = 0; level_index < levelNames.size(); ++level_index) {
 			if (level_index < savegame.records.size() && savegame.records.at(level_index).score() >= 0) {
-				levelRecords.at(level_index) = fmt::format("{}", int(savegame.records.at(level_index).score()));
+				levelRecords.at(level_index) = fmt::format("{}", savegame.records.at(level_index).score());
 				levelRanks.at(level_index) = Session::getScoreRank(settings, savegame.records.at(level_index).score(), levelTargetScores.at(level_index));
 			} else {
 				levelRecords.at(level_index) = "---";
