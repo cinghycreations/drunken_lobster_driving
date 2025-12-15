@@ -1047,10 +1047,48 @@ void Session::updateCarDrive(const std::chrono::microseconds delta_time, const f
 }
 
 void Session::updateCarCollisions(const std::chrono::microseconds total_time) {
-	// FIXME Car still misses to destroy some buildings sometimes
-
 	const int2 prev_tile = glm::floor(carPrevPosition);
 	const int2 curr_tile = glm::floor(carPosition);
+
+	//---------- Destroy buildings ----------//
+
+	if (curr_tile.x >= 0 && curr_tile.x < worldSize.x && curr_tile.y >= 0 && curr_tile.y < worldSize.y) {
+		CellState& cell = cells.at(curr_tile.y * worldSize.x + curr_tile.x);
+		const bool destructible = (cell.buildingType == BuildingType::Garden || cell.buildingType == BuildingType::House || cell.buildingType == BuildingType::GasPump ||
+								   cell.buildingType == BuildingType::Skyscraper || cell.buildingType == BuildingType::Nuclear);
+		if (destructible && !cell.destructed) {
+			const BuildingSettings* building_settings = nullptr;
+			if (cell.buildingType == BuildingType::Garden) {
+				building_settings = &settings.gameplay.garden;
+			} else if (cell.buildingType == BuildingType::House) {
+				building_settings = &settings.gameplay.house;
+			} else if (cell.buildingType == BuildingType::GasPump) {
+				building_settings = &settings.gameplay.gaspump;
+			} else if (cell.buildingType == BuildingType::Skyscraper) {
+				building_settings = &settings.gameplay.skyscraper;
+			} else if (cell.buildingType == BuildingType::Nuclear) {
+				building_settings = &settings.gameplay.nuclear;
+			}
+
+			cell.destructed = true;
+			cell.destructionTime = total_time;
+
+			carStats.speedStackedMultiplier += building_settings->speedMultiplierBonus;
+			sequence.push_back(cell.buildingType);
+			sequenceTimeLeft = TimeUtils::floatSecondsToMicroseconds(settings.gameplay.sequenceTime);
+
+			const float blast = Session::scoreSequence(settings, sequence);
+			const float blast_in_range =
+				std::clamp<float>((blast - settings.camera.shake.blastRange.x) / (settings.camera.shake.blastRange.y - settings.camera.shake.blastRange.x), 0, 1);
+			const float duration = glm::lerp<float>(settings.camera.shake.durationRange.x, settings.camera.shake.durationRange.y, blast_in_range);
+			const float period = glm::lerp<float>(settings.camera.shake.periodRange.x, settings.camera.shake.periodRange.y, blast_in_range);
+			const float strength = glm::lerp<float>(settings.camera.shake.strengthRange.x, settings.camera.shake.strengthRange.y, blast_in_range);
+			cameraShaker.shake(duration, period, strength);
+		}
+	}
+
+	//---------- Collision with impassables ----------//
+
 	if (prev_tile == curr_tile) {
 		return;
 	}
@@ -1093,37 +1131,6 @@ void Session::updateCarCollisions(const std::chrono::microseconds total_time) {
 		carStats.speedStackedMultiplier = 0;
 
 		return;
-	}
-
-	CellState& cell = cells.at(curr_tile.y * worldSize.x + curr_tile.x);
-	if (cell.buildingType != BuildingType::None && !cell.destructed) {
-		const BuildingSettings* building_settings = nullptr;
-		if (cell.buildingType == BuildingType::Garden) {
-			building_settings = &settings.gameplay.garden;
-		} else if (cell.buildingType == BuildingType::House) {
-			building_settings = &settings.gameplay.house;
-		} else if (cell.buildingType == BuildingType::GasPump) {
-			building_settings = &settings.gameplay.gaspump;
-		} else if (cell.buildingType == BuildingType::Skyscraper) {
-			building_settings = &settings.gameplay.skyscraper;
-		} else if (cell.buildingType == BuildingType::Nuclear) {
-			building_settings = &settings.gameplay.nuclear;
-		}
-
-		cell.destructed = true;
-		cell.destructionTime = total_time;
-
-		carStats.speedStackedMultiplier += building_settings->speedMultiplierBonus;
-		sequence.push_back(cell.buildingType);
-		sequenceTimeLeft = TimeUtils::floatSecondsToMicroseconds(settings.gameplay.sequenceTime);
-
-		const float blast = Session::scoreSequence(settings, sequence);
-		const float blast_in_range =
-			std::clamp<float>((blast - settings.camera.shake.blastRange.x) / (settings.camera.shake.blastRange.y - settings.camera.shake.blastRange.x), 0, 1);
-		const float duration = glm::lerp<float>(settings.camera.shake.durationRange.x, settings.camera.shake.durationRange.y, blast_in_range);
-		const float period = glm::lerp<float>(settings.camera.shake.periodRange.x, settings.camera.shake.periodRange.y, blast_in_range);
-		const float strength = glm::lerp<float>(settings.camera.shake.strengthRange.x, settings.camera.shake.strengthRange.y, blast_in_range);
-		cameraShaker.shake(duration, period, strength);
 	}
 }
 
