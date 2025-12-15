@@ -337,18 +337,21 @@ void Settings::update(const Storage& storage) {
 //////////////
 
 struct LevelRecord {
-	float score = -1;
+	float score1 = -1;
 	float time = -1;
 
-	NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(LevelRecord, score, time);
+	float& score() {
+		return score1;
+	}
+
+	NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(LevelRecord, score1, time);
 };
 
 struct Savegame {
-	int version = 0;
 	std::string language = "en";
 	std::vector<LevelRecord> records;
 
-	NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(Savegame, version, language, records);
+	NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(Savegame, language, records);
 };
 
 /////////////
@@ -1416,8 +1419,6 @@ private:
 		TimeAttack,
 	};
 
-	static constexpr int expectedSavegameVersion = 1;
-
 	const Settings& settings;
 	const Storage& storage;
 	Content& content;
@@ -1444,7 +1445,7 @@ private:
 
 	std::vector<float> levelTargetScores;
 	std::vector<float> levelTargetTimes;
-	Savegame savegame = Savegame{.version = expectedSavegameVersion};
+	Savegame savegame;
 
 	std::unique_ptr<Session> session;
 	GameMode sessionGameMode;
@@ -1609,13 +1610,9 @@ void Launcher::load() {
 
 		const nlohmann::json json = nlohmann::json::parse(data);
 		const Savegame loaded_savegame = json;
-		if (loaded_savegame.version == expectedSavegameVersion) {
-			savegame = loaded_savegame;
-		} else {
-			savegame = Savegame{.version = expectedSavegameVersion};
-		}
+		savegame = loaded_savegame;
 	} else {
-		savegame = Savegame{.version = expectedSavegameVersion};
+		savegame = Savegame{};
 	}
 
 	const bool close_ok = SDL_CloseStorage(storage);
@@ -1632,9 +1629,9 @@ void Launcher::refreshGameMode(const GameMode game_mode) {
 		currentMode = "Sequence";
 
 		for (int level_index = 0; level_index < levelNames.size(); ++level_index) {
-			if (level_index < savegame.records.size() && savegame.records.at(level_index).score >= 0) {
-				levelRecords.at(level_index) = fmt::format("{}", int(savegame.records.at(level_index).score));
-				levelRanks.at(level_index) = Session::getScoreRank(settings, savegame.records.at(level_index).score, levelTargetScores.at(level_index));
+			if (level_index < savegame.records.size() && savegame.records.at(level_index).score() >= 0) {
+				levelRecords.at(level_index) = fmt::format("{}", int(savegame.records.at(level_index).score()));
+				levelRanks.at(level_index) = Session::getScoreRank(settings, savegame.records.at(level_index).score(), levelTargetScores.at(level_index));
 			} else {
 				levelRecords.at(level_index) = "---";
 				levelRanks.at(level_index) = "---";
@@ -1706,8 +1703,8 @@ void Launcher::update(const std::chrono::microseconds real_total_time, const std
 			}
 
 			if (sessionGameMode == GameMode::Destruction) {
-				if (savegame.records.at(sessionLevelIndex).score < 0 || session->getScore() > savegame.records.at(sessionLevelIndex).score) {
-					savegame.records.at(sessionLevelIndex).score = session->getScore();
+				if (savegame.records.at(sessionLevelIndex).score() < 0 || session->getScore() > savegame.records.at(sessionLevelIndex).score()) {
+					savegame.records.at(sessionLevelIndex).score() = session->getScore();
 					save();
 					refreshGameMode(GameMode::Destruction);
 				}
