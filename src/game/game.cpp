@@ -1284,7 +1284,7 @@ void Session::renderGrid() {
 	}
 }
 
-// TODO: unit tests for scoring functions
+// TODO Unit tests for scoring functions
 
 const std::string& Session::getScoreRank(const Settings& settings, const float score, const float target_score) {
 	SDL_assert(target_score > 0);
