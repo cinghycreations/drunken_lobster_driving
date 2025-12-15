@@ -424,7 +424,7 @@ Content::Content(Storage& _storage, SDL_Renderer* renderer)
 // Session //
 /////////////
 
-// FIXME Set share params to basic values, as excessive shake can lead to sickness
+// FIXME Set shake params to basic values, as excessive shake can lead to sickness
 
 class CameraShaker {
 public:
