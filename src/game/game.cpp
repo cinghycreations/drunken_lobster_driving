@@ -1032,51 +1032,54 @@ void Session::updateCarDrive(const std::chrono::microseconds delta_time, const f
 }
 
 void Session::updateCarCollisions(const std::chrono::microseconds total_time) {
-	// FIXME Car sometimes goes through impassable tiles without colliding
-
-	const float2 delta = carPosition - carPrevPosition;
-	int2 prev_tile = glm::floor(carPrevPosition);
-	int2 curr_tile = glm::floor(carPosition);
-
+	const int2 prev_tile = glm::floor(carPrevPosition);
+	const int2 curr_tile = glm::floor(carPosition);
 	if (prev_tile == curr_tile) {
 		return;
 	}
 
-	if (curr_tile == prev_tile + int2(-1, -1)) {
-		curr_tile = prev_tile + (delta.x > delta.y ? int2(-1, 0) : int2(0, -1));
-	}
+	const bool check_left = (curr_tile.x == prev_tile.x - 1);
+	const bool check_right = (curr_tile.x == prev_tile.x + 1);
+	const bool check_top = (curr_tile.y == prev_tile.y - 1);
+	const bool check_bottom = (curr_tile.y == prev_tile.y + 1);
 
-	if (curr_tile == prev_tile + int2(-1, 1)) {
-		curr_tile = prev_tile + (delta.x > delta.y ? int2(-1, 0) : int2(0, 1));
-	}
+	auto is_hit = [&](const int2 cell) -> bool {
+		return cell.x < 0 || cell.x >= worldSize.x || cell.y < 0 || cell.y >= worldSize.y || cells.at(cell.y * worldSize.x + cell.x).buildingType == BuildingType::Impassable;
+	};
+	const bool hit_left = check_left && is_hit(prev_tile + int2(-1, 0));
+	const bool hit_right = check_right && is_hit(prev_tile + int2(1, 0));
+	const bool hit_top = check_top && is_hit(prev_tile + int2(0, -1));
+	const bool hit_bottom = check_bottom && is_hit(prev_tile + int2(0, 1));
+	if (hit_left || hit_right || hit_top || hit_bottom) {
+		constexpr float margin = 0.001f;
 
-	if (curr_tile == prev_tile + int2(1, -1)) {
-		curr_tile = prev_tile + (delta.x > delta.y ? int2(1, 0) : int2(0, -1));
-	}
-
-	if (curr_tile == prev_tile + int2(1, 1)) {
-		curr_tile = prev_tile + (delta.x > delta.y ? int2(-1, 0) : int2(0, 1));
-	}
-
-	bool bouncing = false;
-
-	do {
-		if (curr_tile.x < 0 || curr_tile.x >= worldSize.x || curr_tile.y < 0 || curr_tile.y >= worldSize.y) {
-			bouncing = true;
-			break;
+		if (hit_left) {
+			carPosition = float2(prev_tile.x + margin, carPosition.y);
+			carForwardDirection = glm::reflect(carForwardDirection, float2(1, 0));
 		}
 
-		CellState& cell = cells.at(curr_tile.y * worldSize.x + curr_tile.x);
-
-		if (cell.buildingType == BuildingType::None || cell.destructed) {
-			break;
+		if (hit_right) {
+			carPosition = float2(curr_tile.x - margin, carPosition.y);
+			carForwardDirection = glm::reflect(carForwardDirection, float2(-1, 0));
 		}
 
-		if (cell.buildingType == BuildingType::Impassable) {
-			bouncing = true;
-			break;
+		if (hit_top) {
+			carPosition = float2(carPosition.x, prev_tile.y + margin);
+			carForwardDirection = glm::reflect(carForwardDirection, float2(0, 1));
 		}
 
+		if (hit_bottom) {
+			carPosition = float2(carPosition.x, curr_tile.y - margin);
+			carForwardDirection = glm::reflect(carForwardDirection, float2(0, -1));
+		}
+
+		carStats.speedStackedMultiplier = 0;
+
+		return;
+	}
+
+	CellState& cell = cells.at(curr_tile.y * worldSize.x + curr_tile.x);
+	if (cell.buildingType != BuildingType::None && !cell.destructed) {
 		const BuildingSettings* building_settings = nullptr;
 		if (cell.buildingType == BuildingType::Garden) {
 			building_settings = &settings.gameplay.garden;
@@ -1104,30 +1107,6 @@ void Session::updateCarCollisions(const std::chrono::microseconds total_time) {
 		const float period = glm::lerp<float>(settings.camera.shake.periodRange.x, settings.camera.shake.periodRange.y, blast_in_range);
 		const float strength = glm::lerp<float>(settings.camera.shake.strengthRange.x, settings.camera.shake.strengthRange.y, blast_in_range);
 		cameraShaker.shake(duration, period, strength);
-	} while (false);
-
-	if (bouncing) {
-		if (curr_tile == prev_tile + int2(1, 0)) {
-			carPosition = float2(curr_tile.x, carPosition.y);
-			carForwardDirection = glm::reflect(carForwardDirection, float2(-1, 0));
-		}
-
-		if (curr_tile == prev_tile + int2(-1, 0)) {
-			carPosition = float2(prev_tile.x, carPosition.y);
-			carForwardDirection = glm::reflect(carForwardDirection, float2(1, 0));
-		}
-
-		if (curr_tile == prev_tile + int2(0, -1)) {
-			carPosition = float2(carPosition.x, prev_tile.y);
-			carForwardDirection = glm::reflect(carForwardDirection, float2(0, 1));
-		}
-
-		if (curr_tile == prev_tile + int2(0, 1)) {
-			carPosition = float2(carPosition.x, curr_tile.y);
-			carForwardDirection = glm::reflect(carForwardDirection, float2(0, -1));
-		}
-
-		carStats.speedStackedMultiplier = 0;
 	}
 }
 
