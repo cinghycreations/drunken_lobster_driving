@@ -2,5 +2,39 @@
     "todo-tree.filtering.excludeGlobs": [
         "ext",
         "android-project"
-    ]
+    ],
+    "todo-tree.general.tags": [
+        "TODO-CRITICAL",
+        "TODO",
+        "TODO-MINOR",
+        "FIXME-CRITICAL",
+        "FIXME",
+        "FIXME-MINOR",
+    ],
+    "todo-tree.highlights.customHighlight": {
+        "TODO-CRITICAL": {
+            "icon": "check-circle",
+            "iconColour": "red"
+        },
+        "TODO": {
+            "icon": "check-circle",
+            "iconColour": "green"
+        },
+        "TODO-MINOR": {
+            "icon": "check-circle",
+            "iconColour": "grey"
+        },
+        "FIXME-CRITICAL": {
+            "icon": "flame",
+            "iconColour": "red"
+        },
+        "FIXME": {
+            "icon": "flame",
+            "iconColour": "green"
+        },
+        "FIXME-MINOR": {
+            "icon": "flame",
+            "iconColour": "grey"
+        }
+    }
 }
