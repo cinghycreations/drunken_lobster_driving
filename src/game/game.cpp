@@ -28,6 +28,7 @@
 #ifdef CC_HAS_EMBED_CONTENT
 #include <cmrc/cmrc.hpp>
 #endif
+#include <stb_vorbis.c>
 
 using float2 = glm::vec2;
 using float3 = glm::vec3;
@@ -354,6 +355,112 @@ struct Savegame {
 	NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(Savegame, language, records);
 };
 
+///////////
+// Audio //
+///////////
+
+struct Sound {
+	SDL_AudioSpec spec;
+	short* data = nullptr;
+	int dataSize = 0;
+	SDL_AudioStream* audioStream;
+
+	Sound(Storage& storage, const std::filesystem::path& path);
+	~Sound();
+};
+
+Sound::Sound(Storage& storage, const std::filesystem::path& path) {
+	SDL_IOStream* stream = storage.open(path);
+	size_t encoded_size = 0;
+	void* encoded_data = SDL_LoadFile_IO(stream, &encoded_size, true);
+	SDL_assert(encoded_data);
+
+	int decoded_channels = 0;
+	int decoded_freq = 0;
+	data = nullptr;
+	dataSize = stb_vorbis_decode_memory(reinterpret_cast<const uint8_t*>(encoded_data), encoded_size, &decoded_channels, &decoded_freq, &data);
+	SDL_assert(dataSize > 0);
+
+	spec.format = SDL_AUDIO_S16;
+	spec.channels = decoded_channels;
+	spec.freq = decoded_freq;
+	audioStream = SDL_CreateAudioStream(&spec, &spec);
+	SDL_assert(audioStream);
+}
+
+Sound::~Sound() {
+	SDL_DestroyAudioStream(audioStream);
+	audioStream = nullptr;
+
+	std::free(data);
+	data = nullptr;
+}
+
+class Audio {
+public:
+	Audio();
+	~Audio();
+
+	void pause();
+	void resume();
+
+	void playSound(const Sound& sound, const bool looping);
+	void stopSound(const Sound& sound);
+
+private:
+	SDL_AudioDeviceID deviceId = 0;
+	bool devicePaused = false;
+
+	static void loopingCallback(void* userdata, SDL_AudioStream* stream, int additional_amount, int total_amount);
+};
+
+Audio::Audio() {
+	deviceId = SDL_OpenAudioDevice(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, nullptr);
+	SDL_assert(deviceId != 0);
+}
+
+Audio::~Audio() {
+	SDL_CloseAudioDevice(deviceId);
+	deviceId = 0;
+}
+
+void Audio::pause() {
+	bool pause_ok = SDL_PauseAudioDevice(deviceId);
+	SDL_assert(pause_ok);
+}
+
+void Audio::resume() {
+	bool resume_ok = SDL_ResumeAudioDevice(deviceId);
+	SDL_assert(resume_ok);
+}
+
+void Audio::playSound(const Sound& sound, const bool looping) {
+	const bool clear_ok = SDL_ClearAudioStream(sound.audioStream);
+	SDL_assert(clear_ok);
+
+	if (looping) {
+		SDL_SetAudioStreamGetCallback(sound.audioStream, &Audio::loopingCallback, const_cast<void*>(static_cast<const void*>(&sound)));
+	} else {
+		const bool put_data_ok = SDL_PutAudioStreamData(sound.audioStream, sound.data, sound.dataSize);
+		SDL_assert(put_data_ok);
+	}
+
+	const bool bind_ok = SDL_BindAudioStream(deviceId, sound.audioStream);
+	SDL_assert(bind_ok);
+}
+
+void Audio::stopSound(const Sound& sound) {
+	SDL_UnbindAudioStream(sound.audioStream);
+}
+
+void Audio::loopingCallback(void* userdata, SDL_AudioStream* stream, int additional_amount, int total_amount) {
+	if (additional_amount > 0) {
+		const Sound& sound = *reinterpret_cast<const Sound*>(userdata);
+		const bool put_data_ok = SDL_PutAudioStreamData(sound.audioStream, sound.data, sound.dataSize);
+		SDL_assert(put_data_ok);
+	}
+}
+
 /////////////
 // Content //
 /////////////
@@ -409,6 +516,10 @@ struct Content {
 	Flipbook nuclearFlipbook;
 	Flipbook skyscraperFlipbook;
 	Flipbook backgroundFlipbook;
+	Sound menuSound;
+	Sound ingameSound;
+	Sound crashSound;
+	Sound skidSound;
 
 	Content(Storage& _storage, SDL_Renderer* renderer);
 };
@@ -418,7 +529,8 @@ Content::Content(Storage& _storage, SDL_Renderer* renderer)
 	  buildingsFlipbook(storage, renderer, "buildings/buildings{:04}.png", 1), gardenFlipbook(storage, renderer, "buildings/garden{:04}.png", 0),
 	  gaspumpFlipbook(storage, renderer, "buildings/gaspump{:04}.png", 0), houseFlipbook(storage, renderer, "buildings/house{:04}.png", 0),
 	  nuclearFlipbook(storage, renderer, "buildings/nuclear{:04}.png", 0), skyscraperFlipbook(storage, renderer, "buildings/skyscraper{:04}.png", 0),
-	  backgroundFlipbook(storage, renderer, "background/background{:04}.png", 1) {}
+	  backgroundFlipbook(storage, renderer, "background/background{:04}.png", 1), menuSound(storage, "sfx/menu.ogg"), ingameSound(storage, "sfx/ingame.ogg"),
+	  crashSound(storage, "sfx/crash.ogg"), skidSound(storage, "sfx/skid.ogg") {}
 
 /////////////
 // Session //
@@ -493,7 +605,8 @@ public:
 		Nuclear,
 	};
 
-	Session(const Settings& _settings, const Storage& _storage, const Content& _content, SDL_Window* _window, SDL_Renderer* _renderer, const std::filesystem::path& level_path);
+	Session(const Settings& _settings, const Storage& _storage, Audio& _audio, const Content& _content, SDL_Window* _window, SDL_Renderer* _renderer,
+			const std::filesystem::path& level_path);
 	~Session();
 
 	void update(const std::chrono::microseconds delta_real_time);
@@ -561,6 +674,7 @@ private:
 	const Settings& settings;
 	const Storage& storage;
 	const Content& content;
+	Audio& audio;
 	SDL_Window* window;
 	SDL_Renderer* renderer;
 	int2 worldSize;
@@ -611,8 +725,10 @@ private:
 	void renderGrid();
 };
 
-Session::Session(const Settings& _settings, const Storage& _storage, const Content& _content, SDL_Window* _window, SDL_Renderer* _renderer, const std::filesystem::path& level_path)
-	: settings(_settings), storage(_storage), content(_content), window(_window), renderer(_renderer), sequenceTimeLeft(0), countdownTime(3000000 - 1), sessionTotalTime(0) {
+Session::Session(const Settings& _settings, const Storage& _storage, Audio& _audio, const Content& _content, SDL_Window* _window, SDL_Renderer* _renderer,
+				 const std::filesystem::path& level_path)
+	: settings(_settings), storage(_storage), audio(_audio), content(_content), window(_window), renderer(_renderer), sequenceTimeLeft(0), countdownTime(3000000 - 1),
+	  sessionTotalTime(0) {
 
 	SDL_IOStream* level_stream = storage.open(level_path);
 	size_t level_data_size = 0;
@@ -1422,7 +1538,7 @@ size_t StorageFileInterface::Tell(Rml::FileHandle handle) {
 
 class Launcher {
 public:
-	Launcher(const Settings& _settings, const Storage& _storage, Content& _content, SDL_Window* _window, SDL_Renderer* _renderer, Translator& _translator,
+	Launcher(const Settings& _settings, const Storage& _storage, Audio& _audio, Content& _content, SDL_Window* _window, SDL_Renderer* _renderer, Translator& _translator,
 			 Rml::Context* ui_context);
 	~Launcher();
 
@@ -1443,6 +1559,7 @@ private:
 
 	const Settings& settings;
 	const Storage& storage;
+	Audio& audio;
 	Content& content;
 	SDL_Window* window;
 	SDL_Renderer* renderer;
@@ -1509,9 +1626,9 @@ private:
 	static std::string renderSequence(const std::vector<Session::BuildingType>& sequence);
 };
 
-Launcher::Launcher(const Settings& _settings, const Storage& _storage, Content& _content, SDL_Window* _window, SDL_Renderer* _renderer, Translator& _translator,
+Launcher::Launcher(const Settings& _settings, const Storage& _storage, Audio& _audio, Content& _content, SDL_Window* _window, SDL_Renderer* _renderer, Translator& _translator,
 				   Rml::Context* ui_context)
-	: settings(_settings), storage(_storage), content(_content), window(_window), renderer(_renderer), translator(_translator), uiContext(ui_context) {
+	: settings(_settings), storage(_storage), audio(_audio), content(_content), window(_window), renderer(_renderer), translator(_translator), uiContext(ui_context) {
 
 	buildVersion = fmt::format("v{}", CC_BUILD_VERSION);
 
@@ -1559,6 +1676,9 @@ Launcher::Launcher(const Settings& _settings, const Storage& _storage, Content& 
 	document = uiContext->LoadDocument("ui/home.html");
 	SDL_assert(document);
 	document->Show();
+
+	audio.playSound(content.menuSound, true);
+	audio.resume();
 }
 
 Launcher::~Launcher() {
@@ -1770,11 +1890,13 @@ void Launcher::goToPage(const std::string& page) {
 }
 
 void Launcher::createSession(const int level_index) {
-	const std::filesystem::path level_path = fmt::format("levels/level{}.tmj", level_index);
+	audio.stopSound(content.menuSound);
+	audio.playSound(content.ingameSound, true);
 
+	const std::filesystem::path level_path = fmt::format("levels/level{}.tmj", level_index);
 	sessionLevelIndex = level_index;
 	session.reset();
-	session.reset(new Session(settings, storage, content, window, renderer, level_path));
+	session.reset(new Session(settings, storage, audio, content, window, renderer, level_path));
 	resultsShown = false;
 }
 
@@ -1782,6 +1904,9 @@ void Launcher::destroySession() {
 	sessionLevelIndex = -1;
 	session.reset();
 	resultsShown = false;
+
+	audio.stopSound(content.ingameSound);
+	audio.playSound(content.menuSound, true);
 }
 
 void Launcher::selectLanguage(Rml::DataModelHandle handle, Rml::Event& event, const Rml::VariantList& params) {
@@ -1984,6 +2109,7 @@ private:
 	std::unique_ptr<SystemInterface> uiSystem;
 	std::unique_ptr<RenderInterface_SDL> uiRenderer;
 	Rml::Context* uiContext;
+	std::unique_ptr<Audio> audioStream;
 	std::unique_ptr<Content> content;
 	std::unique_ptr<Launcher> launcher;
 
@@ -1996,7 +2122,7 @@ App::App(int argc, char* argv[]) {
 	const bool hint_ok = SDL_SetHint(SDL_HINT_ORIENTATIONS, "LandscapeLeft LandscapeRight");
 	SDL_assert(hint_ok);
 
-	bool init_ok = SDL_Init(SDL_INIT_EVENTS | SDL_INIT_VIDEO | SDL_INIT_GAMEPAD);
+	bool init_ok = SDL_Init(SDL_INIT_EVENTS | SDL_INIT_VIDEO | SDL_INIT_GAMEPAD | SDL_INIT_AUDIO);
 	SDL_assert(init_ok);
 
 	SDL_WindowFlags window_flags = SDL_WINDOW_RESIZABLE | SDL_WINDOW_MAXIMIZED;
@@ -2073,8 +2199,9 @@ App::App(int argc, char* argv[]) {
 		SDL_assert(load_font2_ok);
 	}
 
+	audioStream.reset(new Audio);
 	content.reset(new Content(*storage, renderer));
-	launcher.reset(new Launcher(settings, *storage, *content, window, renderer, *translator, uiContext));
+	launcher.reset(new Launcher(settings, *storage, *audioStream, *content, window, renderer, *translator, uiContext));
 	realTotalTime = std::chrono::microseconds(SDL_GetTicksNS() / 1000);
 }
 
