@@ -35,6 +35,14 @@ using float3 = glm::vec3;
 using float4 = glm::vec4;
 using int2 = glm::ivec2;
 
+///////////////////////////
+// Compile-time features //
+///////////////////////////
+
+namespace Features {
+constexpr bool enableSkidAudio = false;
+};
+
 ///////////////////////
 // GLM serialization //
 ///////////////////////
@@ -359,45 +367,23 @@ struct Savegame {
 // Audio //
 ///////////
 
+class Audio;
+
 struct Sound {
+	Audio& audio;
 	SDL_AudioSpec spec;
 	short* data = nullptr;
 	int dataSize = 0;
 	SDL_AudioStream* audioStream;
 
-	Sound(Storage& storage, const std::filesystem::path& path);
+	Sound(Storage& storage, Audio& _audio, const std::filesystem::path& path);
 	~Sound();
 };
 
-Sound::Sound(Storage& storage, const std::filesystem::path& path) {
-	SDL_IOStream* stream = storage.open(path);
-	size_t encoded_size = 0;
-	void* encoded_data = SDL_LoadFile_IO(stream, &encoded_size, true);
-	SDL_assert(encoded_data);
-
-	int decoded_channels = 0;
-	int decoded_freq = 0;
-	data = nullptr;
-	dataSize = stb_vorbis_decode_memory(reinterpret_cast<const uint8_t*>(encoded_data), encoded_size, &decoded_channels, &decoded_freq, &data);
-	SDL_assert(dataSize > 0);
-
-	spec.format = SDL_AUDIO_S16;
-	spec.channels = decoded_channels;
-	spec.freq = decoded_freq;
-	audioStream = SDL_CreateAudioStream(&spec, &spec);
-	SDL_assert(audioStream);
-}
-
-Sound::~Sound() {
-	SDL_DestroyAudioStream(audioStream);
-	audioStream = nullptr;
-
-	std::free(data);
-	data = nullptr;
-}
-
 class Audio {
 public:
+	SDL_AudioDeviceID deviceId = 0;
+
 	Audio();
 	~Audio();
 
@@ -408,11 +394,41 @@ public:
 	void stopSound(const Sound& sound);
 
 private:
-	SDL_AudioDeviceID deviceId = 0;
-	bool devicePaused = false;
-
 	static void loopingCallback(void* userdata, SDL_AudioStream* stream, int additional_amount, int total_amount);
 };
+
+Sound::Sound(Storage& storage, Audio& _audio, const std::filesystem::path& path) : audio(_audio) {
+	SDL_IOStream* stream = storage.open(path);
+	size_t encoded_size = 0;
+	void* encoded_data = SDL_LoadFile_IO(stream, &encoded_size, true);
+	SDL_assert(encoded_data);
+
+	data = nullptr;
+	int decoded_channels = 0;
+	int decoded_freq = 0;
+	const int decoded_samples = stb_vorbis_decode_memory(reinterpret_cast<const uint8_t*>(encoded_data), encoded_size, &decoded_channels, &decoded_freq, &data);
+	SDL_assert(decoded_samples > 0);
+	dataSize = decoded_samples * decoded_channels * sizeof(int16_t);
+
+	spec.format = SDL_AUDIO_S16;
+	spec.channels = decoded_channels;
+	spec.freq = decoded_freq;
+	audioStream = SDL_CreateAudioStream(&spec, &spec);
+	SDL_assert(audioStream);
+
+	const bool bind_ok = SDL_BindAudioStream(audio.deviceId, audioStream);
+	SDL_assert(bind_ok);
+}
+
+Sound::~Sound() {
+	SDL_UnbindAudioStream(audioStream);
+
+	SDL_DestroyAudioStream(audioStream);
+	audioStream = nullptr;
+
+	std::free(data);
+	data = nullptr;
+}
 
 Audio::Audio() {
 	deviceId = SDL_OpenAudioDevice(SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK, nullptr);
@@ -444,13 +460,13 @@ void Audio::playSound(const Sound& sound, const bool looping) {
 		const bool put_data_ok = SDL_PutAudioStreamData(sound.audioStream, sound.data, sound.dataSize);
 		SDL_assert(put_data_ok);
 	}
-
-	const bool bind_ok = SDL_BindAudioStream(deviceId, sound.audioStream);
-	SDL_assert(bind_ok);
 }
 
 void Audio::stopSound(const Sound& sound) {
-	SDL_UnbindAudioStream(sound.audioStream);
+	SDL_SetAudioStreamGetCallback(sound.audioStream, nullptr, nullptr);
+
+	const bool clear_ok = SDL_ClearAudioStream(sound.audioStream);
+	SDL_assert(clear_ok);
 }
 
 void Audio::loopingCallback(void* userdata, SDL_AudioStream* stream, int additional_amount, int total_amount) {
@@ -521,16 +537,16 @@ struct Content {
 	Sound crashSound;
 	Sound skidSound;
 
-	Content(Storage& _storage, SDL_Renderer* renderer);
+	Content(Storage& _storage, Audio& audio, SDL_Renderer* renderer);
 };
 
-Content::Content(Storage& _storage, SDL_Renderer* renderer)
+Content::Content(Storage& _storage, Audio& audio, SDL_Renderer* renderer)
 	: storage(_storage), carFlipbook(storage, renderer, "car/car{:04}.png", 1), groundFlipbook(storage, renderer, "roads/road{:04}.png", 1),
 	  buildingsFlipbook(storage, renderer, "buildings/buildings{:04}.png", 1), gardenFlipbook(storage, renderer, "buildings/garden{:04}.png", 0),
 	  gaspumpFlipbook(storage, renderer, "buildings/gaspump{:04}.png", 0), houseFlipbook(storage, renderer, "buildings/house{:04}.png", 0),
 	  nuclearFlipbook(storage, renderer, "buildings/nuclear{:04}.png", 0), skyscraperFlipbook(storage, renderer, "buildings/skyscraper{:04}.png", 0),
-	  backgroundFlipbook(storage, renderer, "background/background{:04}.png", 1), menuSound(storage, "sfx/menu.ogg"), ingameSound(storage, "sfx/ingame.ogg"),
-	  crashSound(storage, "sfx/crash.ogg"), skidSound(storage, "sfx/skid.ogg") {}
+	  backgroundFlipbook(storage, renderer, "background/background{:04}.png", 1), menuSound(storage, audio, "sfx/menu.ogg"), ingameSound(storage, audio, "sfx/ingame.ogg"),
+	  crashSound(storage, audio, "sfx/crash.ogg"), skidSound(storage, audio, "sfx/skid.ogg") {}
 
 /////////////
 // Session //
@@ -1160,6 +1176,16 @@ void Session::updateCarDrive(const std::chrono::microseconds delta_time, const f
 		const bool restore_target_ok = SDL_SetRenderTarget(renderer, nullptr);
 		SDL_assert(restore_target_ok);
 	}
+
+	if (Features::enableSkidAudio) {
+		if (!prev_skid && carSkid) {
+			audio.playSound(content.skidSound, true);
+		}
+
+		if (prev_skid && !carSkid) {
+			audio.stopSound(content.skidSound);
+		}
+	}
 }
 
 void Session::updateCarCollisions(const std::chrono::microseconds total_time) {
@@ -1200,6 +1226,8 @@ void Session::updateCarCollisions(const std::chrono::microseconds total_time) {
 			const float period = glm::lerp<float>(settings.camera.shake.periodRange.x, settings.camera.shake.periodRange.y, blast_in_range);
 			const float strength = glm::lerp<float>(settings.camera.shake.strengthRange.x, settings.camera.shake.strengthRange.y, blast_in_range);
 			cameraShaker.shake(duration, period, strength);
+
+			audio.playSound(content.crashSound, false);
 		}
 	}
 
@@ -2109,7 +2137,7 @@ private:
 	std::unique_ptr<SystemInterface> uiSystem;
 	std::unique_ptr<RenderInterface_SDL> uiRenderer;
 	Rml::Context* uiContext;
-	std::unique_ptr<Audio> audioStream;
+	std::unique_ptr<Audio> audio;
 	std::unique_ptr<Content> content;
 	std::unique_ptr<Launcher> launcher;
 
@@ -2199,9 +2227,9 @@ App::App(int argc, char* argv[]) {
 		SDL_assert(load_font2_ok);
 	}
 
-	audioStream.reset(new Audio);
-	content.reset(new Content(*storage, renderer));
-	launcher.reset(new Launcher(settings, *storage, *audioStream, *content, window, renderer, *translator, uiContext));
+	audio.reset(new Audio);
+	content.reset(new Content(*storage, *audio, renderer));
+	launcher.reset(new Launcher(settings, *storage, *audio, *content, window, renderer, *translator, uiContext));
 	realTotalTime = std::chrono::microseconds(SDL_GetTicksNS() / 1000);
 }
 
@@ -2310,6 +2338,7 @@ SDL_AppResult App::iterate() {
 App::~App() {
 	launcher.reset();
 	content.reset();
+	audio.reset();
 
 	Rml::Shutdown();
 	uiRenderer.reset();
