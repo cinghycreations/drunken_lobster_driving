@@ -1,5 +1,6 @@
 "/content/**/*.png" filter=lfs diff=lfs merge=lfs -text
 "/content/**/*.ttf" filter=lfs diff=lfs merge=lfs -text
+"/content/**/*.ogg" filter=lfs diff=lfs merge=lfs -text
 "/art/**/*.blend" filter=lfs diff=lfs merge=lfs -text
 "/publishing/**/*.png" filter=lfs diff=lfs merge=lfs -text
 "/publishing/**/*.jpg" filter=lfs diff=lfs merge=lfs -text
