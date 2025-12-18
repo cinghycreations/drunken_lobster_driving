@@ -28,3 +28,6 @@
 [submodule "ext/RmlUi"]
 	path = ext/RmlUi
 	url = https://github.com/mikke89/RmlUi.git
+[submodule "ext/stb"]
+	path = ext/stb
+	url = https://github.com/nothings/stb.git
