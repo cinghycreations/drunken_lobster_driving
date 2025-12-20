@@ -1,4 +1,8 @@
 {
+	"audio": {
+		"effectsGain": 0.20000000298023224,
+		"musicGain": 1.0
+	},
 	"camera": {
 		"shake": {
 			"blastRange": {
@@ -83,5 +87,8 @@
 		},
 		"skidSize": 2.0,
 		"skidTileResolution": 128
+	},
+	"system": {
+		"updateTranslations": false
 	}
 }
