@@ -242,16 +242,24 @@ struct SystemSettings {
 	NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(SystemSettings, updateTranslations);
 };
 
+struct AudioSettings {
+	float musicGain = 1;
+	float effectsGain = 1;
+
+	NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(AudioSettings, musicGain, effectsGain);
+};
+
 struct Settings {
 	RenderSettings render;
 	CameraSettings camera;
 	CarSettings car;
 	GameplaySettings gameplay;
 	SystemSettings system;
+	AudioSettings audio;
 
 	void update(const Storage& storage);
 
-	NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(Settings, render, camera, car, gameplay, system);
+	NLOHMANN_DEFINE_TYPE_INTRUSIVE_WITH_DEFAULT(Settings, render, camera, car, gameplay, system, audio);
 };
 
 void Settings::update(const Storage& storage) {
@@ -335,6 +343,11 @@ void Settings::update(const Storage& storage) {
 		if (ImGui::CollapsingHeader("System", ImGuiTreeNodeFlags_DefaultOpen)) {
 			ImGui::Checkbox("Update Translations", &system.updateTranslations);
 		}
+
+		if (ImGui::CollapsingHeader("Audio", ImGuiTreeNodeFlags_DefaultOpen)) {
+			ImGui::SliderFloat("Music Gain", &audio.musicGain, 0, 1);
+			ImGui::SliderFloat("Effects Gain", &audio.effectsGain, 0, 1);
+		}
 	}
 
 	ImGui::End();
@@ -378,6 +391,8 @@ struct Sound {
 
 	Sound(Storage& storage, Audio& _audio, const std::filesystem::path& path);
 	~Sound();
+
+	void setGain(const float gain);
 };
 
 class Audio {
@@ -428,6 +443,11 @@ Sound::~Sound() {
 
 	std::free(data);
 	data = nullptr;
+}
+
+void Sound::setGain(const float gain) {
+	const bool set_gain_ok = SDL_SetAudioStreamGain(audioStream, gain);
+	SDL_assert(set_gain_ok);
 }
 
 Audio::Audio() {
@@ -1705,6 +1725,7 @@ Launcher::Launcher(const Settings& _settings, const Storage& _storage, Audio& _a
 	SDL_assert(document);
 	document->Show();
 
+	content.menuSound.setGain(settings.audio.musicGain);
 	audio.playSound(content.menuSound, true);
 	audio.resume();
 }
@@ -1918,6 +1939,10 @@ void Launcher::goToPage(const std::string& page) {
 }
 
 void Launcher::createSession(const int level_index) {
+	content.ingameSound.setGain(settings.audio.musicGain);
+	content.crashSound.setGain(settings.audio.effectsGain);
+	content.skidSound.setGain(settings.audio.effectsGain);
+
 	audio.stopSound(content.menuSound);
 	audio.playSound(content.ingameSound, true);
 
