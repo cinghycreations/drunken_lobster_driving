@@ -1676,7 +1676,7 @@ Launcher::Launcher(const Settings& _settings, const Storage& _storage, Audio& _a
 				   Rml::Context* ui_context)
 	: settings(_settings), storage(_storage), audio(_audio), content(_content), window(_window), renderer(_renderer), translator(_translator), uiContext(ui_context) {
 
-	buildVersion = fmt::format("v{}", CC_BUILD_VERSION);
+	buildVersion = fmt::format("v{}.{}.{}+{}", CC_VERSION_MAJOR, CC_VERSION_MINOR, CC_VERSION_PATCH, CC_VERSION_BUILD);
 
 	{
 		Rml::DataModelConstructor launcher_model_ctor = uiContext->CreateDataModel("launcher");
