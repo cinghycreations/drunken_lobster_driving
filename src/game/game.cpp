@@ -572,8 +572,6 @@ Content::Content(Storage& _storage, Audio& audio, SDL_Renderer* renderer)
 // Session //
 /////////////
 
-// FIXME Set shake params to basic values, as excessive shake can lead to sickness
-
 class CameraShaker {
 public:
 	void shake(const float _duration, const float _period, const float _strength);
