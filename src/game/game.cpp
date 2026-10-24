@@ -2123,7 +2123,7 @@ std::string Launcher::renderSequence(const std::vector<Session::BuildingType>& s
 
 class SystemInterface : public SystemInterface_SDL {
 public:
-	SystemInterface(Translator& _translator) : translator(_translator) {}
+	SystemInterface(SDL_Window* window, Translator& _translator) : SystemInterface_SDL(window), translator(_translator) {}
 
 	int TranslateString(Rml::String& translated, const Rml::String& input) override;
 
@@ -2226,7 +2226,7 @@ App::App(int argc, char* argv[]) {
 	{
 		translator.reset(new Translator(settings, *storage));
 		uiStorage.reset(new StorageFileInterface(*storage));
-		uiSystem.reset(new SystemInterface(*translator));
+		uiSystem.reset(new SystemInterface(window, *translator));
 		uiRenderer.reset(new RenderInterface_SDL(renderer));
 		Rml::SetFileInterface(uiStorage.get());
 		Rml::SetSystemInterface(uiSystem.get());
