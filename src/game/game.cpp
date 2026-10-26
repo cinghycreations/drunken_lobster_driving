@@ -25,9 +25,6 @@
 #include <imgui_impl_sdlrenderer3.h>
 #include <imgui_stdlib.h>
 #endif
-#ifdef CC_HAS_EMBED_CONTENT
-#include <cmrc/cmrc.hpp>
-#endif
 #include <stb_vorbis.c>
 
 using float2 = glm::vec2;
@@ -102,20 +99,6 @@ private:
 	static std::string normalizePath(const std::filesystem::path& path);
 };
 
-#ifdef CC_HAS_EMBED_CONTENT
-namespace cmrc::content {
-cmrc::embedded_filesystem get_filesystem();
-} // namespace cmrc::content
-
-bool Storage::exists(const std::filesystem::path& path) const {
-	return cmrc::content::get_filesystem().exists(normalizePath(path));
-}
-
-SDL_IOStream* Storage::open(const std::filesystem::path& path) const {
-	cmrc::file file = cmrc::content::get_filesystem().open(normalizePath(path));
-	return SDL_IOFromConstMem(file.begin(), file.size());
-}
-#else
 bool Storage::exists(const std::filesystem::path& path) const {
 	return SDL_GetPathInfo(path.string().c_str(), nullptr);
 }
@@ -123,7 +106,6 @@ bool Storage::exists(const std::filesystem::path& path) const {
 SDL_IOStream* Storage::open(const std::filesystem::path& path) const {
 	return SDL_IOFromFile(path.string().c_str(), "rb");
 }
-#endif
 
 std::string Storage::normalizePath(const std::filesystem::path& path) {
 	std::string norm_path = path.lexically_normal().string();
