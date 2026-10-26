@@ -2158,11 +2158,7 @@ App::App(int argc, char* argv[]) {
 	bool init_ok = SDL_Init(SDL_INIT_EVENTS | SDL_INIT_VIDEO | SDL_INIT_GAMEPAD | SDL_INIT_AUDIO);
 	SDL_assert(init_ok);
 
-	SDL_WindowFlags window_flags = SDL_WINDOW_RESIZABLE | SDL_WINDOW_MAXIMIZED;
-#ifdef CC_HAS_HIDPI
-	window_flags |= SDL_WINDOW_HIGH_PIXEL_DENSITY;
-#endif
-	window = SDL_CreateWindow("Drunken Lobster Driving", 1280, 720, window_flags);
+	window = SDL_CreateWindow("Drunken Lobster Driving", 1280, 720, SDL_WINDOW_RESIZABLE | SDL_WINDOW_MAXIMIZED | SDL_WINDOW_HIGH_PIXEL_DENSITY);
 	SDL_assert(window);
 
 	renderer = SDL_CreateRenderer(window, nullptr);

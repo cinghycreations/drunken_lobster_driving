@@ -41,7 +41,6 @@
             "installDir": "${sourceDir}/temp/install/${presetName}",
             "toolchainFile": "$env{EMSDK_HOME}/upstream/emscripten/cmake/Modules/Platform/Emscripten.cmake",
             "cacheVariables": {
-                "CC_HAS_HIDPI": "OFF",
                 "CMAKE_EXE_LINKER_FLAGS": "-sALLOW_MEMORY_GROWTH --embed-file ${sourceDir}/content/@/"
             }
         },
@@ -53,7 +52,6 @@
             "toolchainFile": "$env{EMSDK_HOME}/upstream/emscripten/cmake/Modules/Platform/Emscripten.cmake",
             "cacheVariables": {
                 "CC_HAS_DEVUI": "OFF",
-                "CC_HAS_HIDPI": "OFF",
                 "CMAKE_EXE_LINKER_FLAGS": "-sALLOW_MEMORY_GROWTH --embed-file ${sourceDir}/content/@/"
             }
         },
