@@ -14,14 +14,17 @@
         background: #ffdab9; /* render.backgroundColor in content/settings.json */
       }
 
-      /* The canvas size is driven by CSS: SDL picks it up on resize (the window is created resizable). */
+      /* The canvas size is driven by CSS: SDL picks it up on resize (the window is created resizable).
+         !important is needed because SDL sets inline sizes on the canvas: in particular it shrinks it to 1x1 when the window
+         is destroyed, which happens when the renderer recreates the window. Without !important, the recreated window would
+         not detect the CSS size and would fall back to the size passed to SDL_CreateWindow. */
       #canvas {
         display: block;
         position: fixed;
         top: 0;
         left: 0;
-        width: 100vw;
-        height: 100vh;
+        width: 100vw !important;
+        height: 100vh !important;
         border: 0;
         outline: none;
         background: #ffdab9;
