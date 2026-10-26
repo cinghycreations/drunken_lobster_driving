@@ -1,0 +1,189 @@
+<!doctype html>
+<html lang="en-us">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+    <title>Drunken Lobster Driving</title>
+    <style>
+      html, body {
+        margin: 0;
+        padding: 0;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        background: #ffdab9; /* render.backgroundColor in content/settings.json */
+      }
+
+      /* The canvas size is driven by CSS: SDL picks it up on resize (the window is created resizable). */
+      #canvas {
+        display: block;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        border: 0;
+        outline: none;
+        background: #ffdab9;
+        touch-action: none;
+      }
+
+      #progress {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        width: min(60vw, 400px);
+        height: 20px;
+        transform: translate(-50%, -50%);
+        box-sizing: border-box;
+        border: 2px solid #1e90ff;
+        border-radius: 10px;
+        padding: 2px;
+        z-index: 1;
+      }
+
+      #progress-fill {
+        width: 0;
+        height: 100%;
+        border-radius: 6px;
+        background: #1e90ff;
+        transition: width 0.1s linear;
+      }
+
+      #fullscreen {
+        position: fixed;
+        top: 12px;
+        right: 12px;
+        width: 40px;
+        height: 40px;
+        padding: 6px;
+        border: 0;
+        border-radius: 6px;
+        background: rgba(0, 0, 0, 0.35);
+        color: #fff;
+        opacity: 0.6;
+        cursor: pointer;
+        z-index: 1;
+      }
+
+      #fullscreen:hover {
+        opacity: 1;
+      }
+
+      #fullscreen svg {
+        display: block;
+        width: 100%;
+        height: 100%;
+      }
+
+      #fullscreen .exit { display: none; }
+      #fullscreen.active .enter { display: none; }
+      #fullscreen.active .exit { display: block; }
+    </style>
+  </head>
+  <body>
+    <canvas id="canvas" oncontextmenu="event.preventDefault()" tabindex="-1"></canvas>
+
+    <div id="progress"><div id="progress-fill"></div></div>
+
+    <button id="fullscreen" type="button" tabindex="-1" title="Toggle fullscreen" aria-label="Toggle fullscreen">
+      <svg class="enter" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="square">
+        <path d="M3 9V3h6M15 3h6v6M21 15v6h-6M9 21H3v-6"/>
+      </svg>
+      <svg class="exit" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="square">
+        <path d="M9 3v6H3M21 9h-6V3M15 21v-6h6M3 15h6v6"/>
+      </svg>
+    </button>
+
+    <script type='text/javascript'>
+      var canvasElement = document.getElementById('canvas');
+      var fullscreenButton = document.getElementById('fullscreen');
+      var progressElement = document.getElementById('progress');
+      var progressFillElement = document.getElementById('progress-fill');
+
+      var setProgress = (fraction) => progressFillElement.style.width = (Math.min(Math.max(fraction, 0), 1) * 100) + '%';
+
+      // Downloads the wasm (which also contains the embedded content) reporting progress, then hands
+      // the response over to streaming compilation. The file name follows the OUTPUT_NAME set in CMakeLists.txt.
+      var fetchWasmWithProgress = async (url) => {
+        var response = await fetch(url, { credentials: 'same-origin' });
+        if (!response.ok) throw new Error(`Failed to download ${url}: ${response.status}`);
+
+        // Content-Length is the compressed size when the server uses gzip/br, so progress is clamped to 100%.
+        // The response is always rebuilt with the wasm MIME type, so streaming compilation works whatever the server sends.
+        var headers = { 'Content-Type': 'application/wasm' };
+        var total = parseInt(response.headers.get('Content-Length')) || 0;
+        if (!response.body) return new Response(await response.arrayBuffer(), { headers });
+
+        var loaded = 0;
+        var reader = response.body.getReader();
+        var stream = new ReadableStream({
+          async pull(controller) {
+            var { done, value } = await reader.read();
+            if (done) {
+              setProgress(1);
+              controller.close();
+              return;
+            }
+            loaded += value.byteLength;
+            if (total) setProgress(loaded / total);
+            controller.enqueue(value);
+          }
+        });
+        return new Response(stream, { headers });
+      };
+
+      var instantiateWasmWithProgress = async (imports) => {
+        var response = await fetchWasmWithProgress('index.wasm');
+        if (WebAssembly.instantiateStreaming) {
+          return WebAssembly.instantiateStreaming(response, imports);
+        }
+        return WebAssembly.instantiate(await response.arrayBuffer(), imports);
+      };
+
+      var fullscreenElement = () => document.fullscreenElement || document.webkitFullscreenElement;
+
+      if (!(document.fullscreenEnabled || document.webkitFullscreenEnabled)) {
+        fullscreenButton.style.display = 'none';
+      }
+
+      // The whole page goes fullscreen (not just the canvas), so that the button stays visible.
+      fullscreenButton.addEventListener('click', () => {
+        var root = document.documentElement;
+        if (fullscreenElement()) {
+          (document.exitFullscreen || document.webkitExitFullscreen).call(document);
+        } else {
+          (root.requestFullscreen || root.webkitRequestFullscreen).call(root);
+        }
+        canvasElement.focus();
+      });
+
+      var updateFullscreenButton = () => fullscreenButton.classList.toggle('active', !!fullscreenElement());
+      document.addEventListener('fullscreenchange', updateFullscreenButton);
+      document.addEventListener('webkitfullscreenchange', updateFullscreenButton);
+
+#if MODULARIZE && !EXPORT_ES6
+      var moduleArgs = {
+#else
+      var Module = {
+#endif
+        canvas: canvasElement,
+        instantiateWasm(imports, successCallback) {
+          instantiateWasmWithProgress(imports).then(
+            (result) => successCallback(result.instance, result.module),
+            (error) => console.error('Failed to instantiate wasm:', error));
+          return {}; // Asynchronous instantiation
+        },
+        onRuntimeInitialized() {
+          progressElement.remove();
+        }
+      };
+    </script>
+    {{{ SCRIPT }}}
+#if MODULARIZE && !EXPORT_ES6
+    <script type='text/javascript'>
+      {{{ EXPORT_NAME }}}(moduleArgs);
+    </script>
+#endif
+  </body>
+</html>
