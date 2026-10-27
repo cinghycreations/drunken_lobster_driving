@@ -41,7 +41,8 @@
             "installDir": "${sourceDir}/temp/install/${presetName}",
             "toolchainFile": "$env{EMSDK_HOME}/upstream/emscripten/cmake/Modules/Platform/Emscripten.cmake",
             "cacheVariables": {
-                "CMAKE_EXE_LINKER_FLAGS": "-sALLOW_MEMORY_GROWTH --embed-file ${sourceDir}/content/@/ --shell-file ${sourceDir}/etc/shell.html"
+                "CC_HAS_BUILDER" : "OFF",
+                "CMAKE_EXE_LINKER_FLAGS": "-sALLOW_MEMORY_GROWTH --embed-file ${sourceDir}/content/emscripten/@/ --shell-file ${sourceDir}/etc/shell.html"
             }
         },
         {
@@ -51,8 +52,9 @@
             "installDir": "${sourceDir}/temp/install/${presetName}",
             "toolchainFile": "$env{EMSDK_HOME}/upstream/emscripten/cmake/Modules/Platform/Emscripten.cmake",
             "cacheVariables": {
+                "CC_HAS_BUILDER" : "OFF",
                 "CC_HAS_DEVUI": "OFF",
-                "CMAKE_EXE_LINKER_FLAGS": "-sALLOW_MEMORY_GROWTH --embed-file ${sourceDir}/content/@/ --shell-file ${sourceDir}/etc/shell.html"
+                "CMAKE_EXE_LINKER_FLAGS": "-sALLOW_MEMORY_GROWTH --embed-file ${sourceDir}/content/emscripten/@/ --shell-file ${sourceDir}/etc/shell.html"
             }
         },
         {
