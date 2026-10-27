@@ -62,8 +62,7 @@
             "installDir": "${sourceDir}/temp/install/${presetName}",
             "toolchainFile": "$env{ANDROID_NDK}/build/cmake/android.toolchain.cmake",
             "cacheVariables": {
-                "ANDROID_ABI": "arm64-v8a",
-                "CC_HAS_EXECUTABLE_AS_LIBRARY": "ON"
+                "ANDROID_ABI": "arm64-v8a"
             }
         },
         {
@@ -74,8 +73,7 @@
             "toolchainFile": "$env{ANDROID_NDK}/build/cmake/android.toolchain.cmake",
             "cacheVariables": {
                 "ANDROID_ABI": "arm64-v8a",
-                "CC_HAS_DEVUI": "OFF",
-                "CC_HAS_EXECUTABLE_AS_LIBRARY": "ON"
+                "CC_HAS_DEVUI": "OFF"
             }
         }
     ],
