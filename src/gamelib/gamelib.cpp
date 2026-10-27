@@ -268,6 +268,43 @@ void Audio::loopingCallback(void* userdata, SDL_AudioStream* stream, int additio
 // Content //
 /////////////
 
+static const char* getImageTypeName(const ImageType type) {
+	SDL_assert(type == ImageType::Png || type == ImageType::Webp);
+	return (type == ImageType::Webp) ? "WEBP" : "PNG";
+}
+
+Image Image::load(const Storage& storage, const std::filesystem::path& path) {
+	SDL_IOStream* stream = storage.open(path);
+	SDL_assert(stream);
+
+	size_t data_size = 0;
+	void* data = SDL_LoadFile_IO(stream, &data_size, true);
+	SDL_assert(data);
+
+	const nlohmann::json json = nlohmann::json::from_cbor(static_cast<uint8_t*>(data), static_cast<uint8_t*>(data) + data_size);
+	const Image image = json;
+	SDL_free(data);
+	return image;
+}
+
+std::shared_ptr<SDL_Surface> Image::createSurface(const Image& image) {
+	SDL_IOStream* stream = SDL_IOFromConstMem(image.data.data(), image.data.size());
+	SDL_assert(stream);
+
+	SDL_Surface* surface = IMG_LoadTyped_IO(stream, true, getImageTypeName(image.type));
+	SDL_assert(surface);
+	return std::shared_ptr<SDL_Surface>(surface, &SDL_DestroySurface);
+}
+
+std::shared_ptr<SDL_Texture> Image::createTexture(const Image& image, SDL_Renderer* renderer) {
+	SDL_IOStream* stream = SDL_IOFromConstMem(image.data.data(), image.data.size());
+	SDL_assert(stream);
+
+	SDL_Texture* texture = IMG_LoadTextureTyped_IO(renderer, stream, true, getImageTypeName(image.type));
+	SDL_assert(texture);
+	return std::shared_ptr<SDL_Texture>(texture, &SDL_DestroyTexture);
+}
+
 Flipbook::Flipbook(Storage& storage, SDL_Renderer* renderer, const char* pattern, const int starting_index) {
 	int index = starting_index;
 	while (true) {
@@ -276,31 +313,18 @@ Flipbook::Flipbook(Storage& storage, SDL_Renderer* renderer, const char* pattern
 			break;
 		}
 
-		SDL_IOStream* stream = storage.open(path);
-		SDL_assert(stream);
-
-		SDL_Texture* texture = IMG_LoadTexture_IO(renderer, stream, true);
-		SDL_assert(texture);
-
-		textures.push_back(texture);
+		textures.push_back(Image::createTexture(Image::load(storage, path), renderer));
 
 		++index;
 	}
 }
 
-Flipbook::~Flipbook() {
-	for (SDL_Texture* texture : textures) {
-		SDL_DestroyTexture(texture);
-	}
-	textures.clear();
-}
-
 Content::Content(Storage& _storage, Audio& audio, SDL_Renderer* renderer)
-	: storage(_storage), carFlipbook(storage, renderer, "car/car{:04}.png", 1), groundFlipbook(storage, renderer, "roads/road{:04}.png", 1),
-	  buildingsFlipbook(storage, renderer, "buildings/buildings{:04}.png", 1), gardenFlipbook(storage, renderer, "buildings/garden{:04}.png", 0),
-	  gaspumpFlipbook(storage, renderer, "buildings/gaspump{:04}.png", 0), houseFlipbook(storage, renderer, "buildings/house{:04}.png", 0),
-	  nuclearFlipbook(storage, renderer, "buildings/nuclear{:04}.png", 0), skyscraperFlipbook(storage, renderer, "buildings/skyscraper{:04}.png", 0),
-	  backgroundFlipbook(storage, renderer, "background/background{:04}.png", 1), menuSound(storage, audio, "sfx/menu.ogg"), ingameSound(storage, audio, "sfx/ingame.ogg"),
+	: storage(_storage), carFlipbook(storage, renderer, "car/car{:04}.image", 1), groundFlipbook(storage, renderer, "roads/road{:04}.image", 1),
+	  buildingsFlipbook(storage, renderer, "buildings/buildings{:04}.image", 1), gardenFlipbook(storage, renderer, "buildings/garden{:04}.image", 0),
+	  gaspumpFlipbook(storage, renderer, "buildings/gaspump{:04}.image", 0), houseFlipbook(storage, renderer, "buildings/house{:04}.image", 0),
+	  nuclearFlipbook(storage, renderer, "buildings/nuclear{:04}.image", 0), skyscraperFlipbook(storage, renderer, "buildings/skyscraper{:04}.image", 0),
+	  backgroundFlipbook(storage, renderer, "background/background{:04}.image", 1), menuSound(storage, audio, "sfx/menu.ogg"), ingameSound(storage, audio, "sfx/ingame.ogg"),
 	  crashSound(storage, audio, "sfx/crash.ogg"), skidSound(storage, audio, "sfx/skid.ogg") {}
 
 /////////////
@@ -923,7 +947,7 @@ void Session::render() {
 	for (int i = 0; i < worldSize.y; ++i) {
 		for (int j = 0; j < worldSize.x; ++j) {
 			const CellState& cell = cells.at(i * worldSize.x + j);
-			SDL_Texture* ground_texture = content.groundFlipbook.textures.at(cell.groundTile);
+			SDL_Texture* ground_texture = content.groundFlipbook.textures.at(cell.groundTile).get();
 			renderEntity(float2(j, i) + float2(0.5f), 1, ground_texture);
 		}
 	}
@@ -943,9 +967,9 @@ void Session::render() {
 			if (cell.destructed) {
 				const int usec_per_frame = 1000000 / 45;
 				const int frame = (sessionTotalTime - cell.destructionTime).count() / usec_per_frame;
-				return flipbook.textures.at(std::clamp<int>(frame, 0, flipbook.textures.size() - 1));
+				return flipbook.textures.at(std::clamp<int>(frame, 0, flipbook.textures.size() - 1)).get();
 			} else {
-				return flipbook.textures.front();
+				return flipbook.textures.front().get();
 			}
 		};
 
@@ -960,9 +984,9 @@ void Session::render() {
 						if (cell.destructed) {
 							const int usec_per_frame = 1000000 / 45;
 							const int frame = (session_time - cell.destructionTime).count() / usec_per_frame;
-							return flipbook.textures.at(std::clamp<int>(frame, 0, flipbook.textures.size() - 1));
+							return flipbook.textures.at(std::clamp<int>(frame, 0, flipbook.textures.size() - 1)).get();
 						} else {
-							return flipbook.textures.front();
+							return flipbook.textures.front().get();
 						}
 					};
 
@@ -990,13 +1014,13 @@ void Session::render() {
 					const float pi2 = std::numbers::pi * 2;
 					const float rotation = car_rotation > 0 ? car_rotation : pi2 - std::fmod(-car_rotation, pi2);
 					const int frame = int(rotation / pi2 * content.carFlipbook.textures.size()) % content.carFlipbook.textures.size();
-					renderEntity(carPosition, settings.car.size, content.carFlipbook.textures.at(frame));
+					renderEntity(carPosition, settings.car.size, content.carFlipbook.textures.at(frame).get());
 				}
 
 				//---------- Non-Destroyed Building ----------//
 
 				if (cell.buildingType != BuildingType::None && !cell.destructed) {
-					SDL_Texture* building_texture = content.buildingsFlipbook.textures.at(cell.buildingTile);
+					SDL_Texture* building_texture = content.buildingsFlipbook.textures.at(cell.buildingTile).get();
 					renderEntity(float2(j, i) + float2(0.5f), 1, building_texture);
 				}
 			}
@@ -1530,7 +1554,7 @@ void Launcher::renderBackground() {
 	for (int i = 0; i < tiles_y + 1; ++i) {
 		for (int j = 0; j < tiles_x + 1; ++j) {
 			const int texture_index = (i + j) % content.backgroundFlipbook.textures.size();
-			SDL_Texture* texture = content.backgroundFlipbook.textures.at(texture_index);
+			SDL_Texture* texture = content.backgroundFlipbook.textures.at(texture_index).get();
 			SDL_assert(texture->w == texture->h);
 
 			const SDL_FRect dest_rect{
@@ -1558,19 +1582,19 @@ std::string Launcher::renderSequence(const std::vector<Session::BuildingType>& s
 		SDL_assert(building != Session::BuildingType::None && building != Session::BuildingType::Impassable);
 		switch (building) {
 		case Session::BuildingType::Garden:
-			stream << "<img src=\"/buildings/garden0000.png\"/>";
+			stream << "<img src=\"/buildings/garden0000.image\"/>";
 			break;
 		case Session::BuildingType::House:
-			stream << "<img src=\"/buildings/house0000.png\"/>";
+			stream << "<img src=\"/buildings/house0000.image\"/>";
 			break;
 		case Session::BuildingType::GasPump:
-			stream << "<img src=\"/buildings/gaspump0000.png\"/>";
+			stream << "<img src=\"/buildings/gaspump0000.image\"/>";
 			break;
 		case Session::BuildingType::Skyscraper:
-			stream << "<img src=\"/buildings/skyscraper0000.png\"/>";
+			stream << "<img src=\"/buildings/skyscraper0000.image\"/>";
 			break;
 		case Session::BuildingType::Nuclear:
-			stream << "<img src=\"/buildings/nuclear0000.png\"/>";
+			stream << "<img src=\"/buildings/nuclear0000.image\"/>";
 			break;
 		}
 	}
@@ -1591,6 +1615,32 @@ int SystemInterface::TranslateString(Rml::String& translated, const Rml::String&
 		translated = input;
 		return 0;
 	}
+}
+
+Rml::TextureHandle RenderInterface::LoadTexture(Rml::Vector2i& texture_dimensions, const Rml::String& source) {
+	const std::filesystem::path path = source;
+	if (path.extension() != std::filesystem::path(".image")) {
+		return RenderInterface_SDL::LoadTexture(texture_dimensions, source);
+	}
+
+	if (!storage.exists(path)) {
+		return {};
+	}
+
+	const std::shared_ptr<SDL_Surface> surface = Image::createSurface(Image::load(storage, path));
+	SDL_Surface* rgba_surface = SDL_ConvertSurface(surface.get(), SDL_PIXELFORMAT_RGBA32);
+	SDL_assert(rgba_surface);
+	SDL_assert(rgba_surface->pitch == rgba_surface->w * 4);
+
+	// RmlUi expects premultiplied alpha, see RenderInterface_SDL::LoadTexture
+	const bool premultiply_ok = SDL_PremultiplySurfaceAlpha(rgba_surface, false);
+	SDL_assert(premultiply_ok);
+
+	texture_dimensions = Rml::Vector2i(rgba_surface->w, rgba_surface->h);
+	const Rml::Span<const Rml::byte> pixels(static_cast<const Rml::byte*>(rgba_surface->pixels), size_t(rgba_surface->pitch * rgba_surface->h));
+	const Rml::TextureHandle texture = GenerateTexture(pixels, texture_dimensions);
+	SDL_DestroySurface(rgba_surface);
+	return texture;
 }
 
 App::App(int argc, char* argv[]) {
@@ -1647,7 +1697,7 @@ App::App(int argc, char* argv[]) {
 		translator.reset(new Translator(settings, *storage));
 		uiStorage.reset(new StorageFileInterface(*storage));
 		uiSystem.reset(new SystemInterface(window, *translator));
-		uiRenderer.reset(new RenderInterface_SDL(renderer));
+		uiRenderer.reset(new RenderInterface(renderer, *storage));
 		Rml::SetFileInterface(uiStorage.get());
 		Rml::SetSystemInterface(uiSystem.get());
 		Rml::SetRenderInterface(uiRenderer.get());

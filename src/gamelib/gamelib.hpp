@@ -247,8 +247,29 @@ private:
 // Content //
 /////////////
 
+enum class ImageType {
+	Png,
+	Webp,
+};
+
+NLOHMANN_JSON_SERIALIZE_ENUM(ImageType, {
+											{ImageType::Png, "Png"},
+											{ImageType::Webp, "Webp"},
+										});
+
+struct Image {
+	ImageType type;
+	nlohmann::json::binary_t data;
+
+	static Image load(const Storage& storage, const std::filesystem::path& path);
+	static std::shared_ptr<SDL_Surface> createSurface(const Image& image);
+	static std::shared_ptr<SDL_Texture> createTexture(const Image& image, SDL_Renderer* renderer);
+
+	NLOHMANN_DEFINE_TYPE_INTRUSIVE(Image, type, data);
+};
+
 struct Flipbook {
-	std::vector<SDL_Texture*> textures;
+	std::vector<std::shared_ptr<SDL_Texture>> textures;
 
 	Flipbook() {}
 	Flipbook(const Flipbook&) = delete;
@@ -257,7 +278,6 @@ struct Flipbook {
 	Flipbook& operator=(Flipbook&&) = default;
 
 	Flipbook(Storage& storage, SDL_Renderer* renderer, const char* pattern, const int starting_index = 0);
-	~Flipbook();
 };
 
 struct Content {
@@ -575,6 +595,16 @@ private:
 	Translator& translator;
 };
 
+class RenderInterface : public RenderInterface_SDL {
+public:
+	RenderInterface(SDL_Renderer* renderer, const Storage& _storage) : RenderInterface_SDL(renderer), storage(_storage) {}
+
+	Rml::TextureHandle LoadTexture(Rml::Vector2i& texture_dimensions, const Rml::String& source) override;
+
+private:
+	const Storage& storage;
+};
+
 class App {
 public:
 	App(int argc, char* argv[]);
@@ -591,7 +621,7 @@ private:
 	std::unique_ptr<Translator> translator;
 	std::unique_ptr<StorageFileInterface> uiStorage;
 	std::unique_ptr<SystemInterface> uiSystem;
-	std::unique_ptr<RenderInterface_SDL> uiRenderer;
+	std::unique_ptr<RenderInterface> uiRenderer;
 	Rml::Context* uiContext;
 	std::unique_ptr<Audio> audio;
 	std::unique_ptr<Content> content;

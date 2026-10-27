@@ -97,7 +97,7 @@ target_link_libraries( game PUBLIC gamelib )
 
 if ( CC_HAS_BUILDER )
 	add_executable( builder src/builder/builder.cpp )
-	target_link_libraries( builder PUBLIC SDL3-static SDL3_image-static fmt glm nlohmann_json stb CLI11 )
+	target_link_libraries( builder PUBLIC gamelib SDL3-static SDL3_image-static fmt glm nlohmann_json stb CLI11 )
 	install( TARGETS builder RUNTIME DESTINATION "${CMAKE_CURRENT_SOURCE_DIR}/content" )
 	install( TARGETS webp webpdemux libwebpmux RUNTIME DESTINATION "${CMAKE_CURRENT_SOURCE_DIR}/content" )
 endif()
