@@ -49,7 +49,7 @@ static void generate() {
 
 	fmt::println(ninja, "rule copy\n  command = cmake -E copy $in $out");
 	fmt::println(ninja, "rule copy_filter\n  command = builder copyfilter --in $in --out $out");
-	fmt::println(ninja, "rule image_windows\n  command = builder image --in $in --out $out");
+	fmt::println(ninja, "rule image_windows\n  command = builder image --webp --in $in --out $out");
 	fmt::println(ninja, "rule image_emscripten\n  command = builder image --webp --in $in --out $out");
 	fmt::println(ninja, "");
 
