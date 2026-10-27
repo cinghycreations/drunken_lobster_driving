@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Drive</title>
+    <link rel="stylesheet" type="text/css" href="/ui/common.css" />
+    <style>
+        /* styling */
+
+        panel {
+            width: 45rem;
+            padding: 0.5rem;
+
+        }
+
+        panel>p {
+            font-size: 2rem;
+            text-align: center;
+        }
+
+        button.level>p {
+            margin: 0rem;
+            padding: 0.1rem;
+        }
+
+        div.spacer {
+            height: 2rem;
+        }
+
+        /* layout */
+
+        body,
+        panel,
+        button.level,
+        .levels-row,
+        .levels-column {
+            display: flex;
+        }
+
+        body {
+            justify-content: center;
+            align-items: center;
+        }
+
+        panel {
+            flex-direction: column;
+        }
+
+        .levels-row {
+            flex-direction: row;
+        }
+
+        .levels-column {
+            flex: 1;
+            flex-direction: column;
+        }
+
+        button.level {
+            flex-direction: row;
+            /* justify-content: space-between; */
+        }
+
+        .levelName {
+            flex: 2;
+        }
+
+        .levelRecord {
+            flex: 1;
+        }
+
+        .levelRank {
+            flex: 2;
+        }
+    </style>
+</head>
+
+<body data-model="launcher">
+    <panel>
+        <button data-event-click="switchMode()">Mode: {{currentMode}}</button>
+        <div class="spacer"></div>
+        <div class="levels-row">
+            <div class="levels-column">
+                <button class="level" data-event-click="playLevel(0)">
+                    <p class="levelName">1. {{levelNames[0]}}</p>
+                    <p class="levelRecord">{{levelRecords[0]}}</p>
+                    <p class="levelRank">{{levelRanks[0]}}</p>
+                </button>
+                <button class="level" data-event-click="playLevel(1)">
+                    <p class="levelName">2. {{levelNames[1]}}</p>
+                    <p class="levelRecord">{{levelRecords[1]}}</p>
+                    <p class="levelRank">{{levelRanks[1]}}</p>
+                </button>
+                <button class="level" data-event-click="playLevel(2)">
+                    <p class="levelName">3. {{levelNames[2]}}</p>
+                    <p class="levelRecord">{{levelRecords[2]}}</p>
+                    <p class="levelRank">{{levelRanks[2]}}</p>
+                </button>
+                <button class="level" data-event-click="playLevel(3)">
+                    <p class="levelName">4. {{levelNames[3]}}</p>
+                    <p class="levelRecord">{{levelRecords[3]}}</p>
+                    <p class="levelRank">{{levelRanks[3]}}</p>
+                </button>
+            </div>
+            <div class="levels-column">
+                <button class="level" data-event-click="playLevel(4)">
+                    <p class="levelName">5. {{levelNames[4]}}</p>
+                    <p class="levelRecord">{{levelRecords[4]}}</p>
+                    <p class="levelRank">{{levelRanks[4]}}</p>
+                </button>
+                <button class="level" data-event-click="playLevel(5)">
+                    <p class="levelName">6. {{levelNames[5]}}</p>
+                    <p class="levelRecord">{{levelRecords[5]}}</p>
+                    <p class="levelRank">{{levelRanks[5]}}</p>
+                </button>
+                <button class="level" data-event-click="playLevel(6)">
+                    <p class="levelName">7. {{levelNames[6]}}</p>
+                    <p class="levelRecord">{{levelRecords[6]}}</p>
+                    <p class="levelRank">{{levelRanks[6]}}</p>
+                </button>
+                <button class="level" data-event-click="playLevel(7)">
+                    <p class="levelName">8. {{levelNames[7]}}</p>
+                    <p class="levelRecord">{{levelRecords[7]}}</p>
+                    <p class="levelRank">{{levelRanks[7]}}</p>
+                </button>
+            </div>
+        </div>
+        <div class="spacer"></div>
+        <button data-event-click="goToHome()">Back</button>
+    </panel>
+</body>
+
+</html>

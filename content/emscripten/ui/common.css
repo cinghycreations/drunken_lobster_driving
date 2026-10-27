@@ -1,0 +1,48 @@
+@font-face {
+    font-family: Lobster;
+    src: "fonts/Lobster-Regular.ttf";
+}
+
+* {
+    font-family: Lobster;
+    font-size: 24px;
+    font-size: 24dp;
+    color: #1e90ff;
+}
+
+@media (min-resolution: 1.75x) {
+    * {
+        font-size: 16px;
+        font-size: 16dp;
+    }
+}
+
+html,
+body {
+    width: 100%;
+    height: 100%;
+    margin: 0rem;
+}
+
+panel {
+    border-width: 0.1rem;
+    border-style: solid;
+    border-color: #1e90ff;
+    border-radius: 1rem;
+    background-color: #ffefd5;
+}
+
+button {
+    font-size: 1.5rem;
+    text-align: center;
+    border-width: 0.1rem;
+    border-style: solid;
+    border-color: #1e90ff;
+    border-radius: 0.5rem;
+    background-color: #ffe4b5;
+    margin: 0.25rem;
+}
+
+button:hover {
+    background-color: #ffd700;
+}

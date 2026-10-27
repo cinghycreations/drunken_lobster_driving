@@ -1,6 +1,10 @@
 /art/**/*.blend filter=lfs diff=lfs merge=lfs -text
+/content/**/*.dll filter=lfs diff=lfs merge=lfs -text
+/content/**/*.exe filter=lfs diff=lfs merge=lfs -text
+/content/**/*.image filter=lfs diff=lfs merge=lfs -text
 /content/**/*.ogg filter=lfs diff=lfs merge=lfs -text
 /content/**/*.png filter=lfs diff=lfs merge=lfs -text
+/content/**/*.sound filter=lfs diff=lfs merge=lfs -text
 /content/**/*.ttf filter=lfs diff=lfs merge=lfs -text
 /publishing/**/*.gif filter=lfs diff=lfs merge=lfs -text
 /publishing/**/*.jpg filter=lfs diff=lfs merge=lfs -text

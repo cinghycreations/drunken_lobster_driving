@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>In-game</title>
+    <link rel="stylesheet" type="text/css" href="/ui/common.css" />
+    <style>
+        body {
+            display: flex;
+            flex-direction: column;
+        }
+
+        header,
+        footer {
+            display: flex;
+            flex-direction: row;
+            justify-content: space-between;
+            padding: 0.5rem;
+        }
+
+        main {
+            flex: 1;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        main>p {
+            font-size: 6rem;
+        }
+
+        panel {
+            padding: 0.5rem;
+            padding-top: 0.25rem;
+            padding-bottom: 0.25rem;
+            height: 2.5rem;
+        }
+
+        panel p {
+            margin-top: 0.25rem;
+            margin-bottom: 0.25rem;
+        }
+
+        .sequence img {
+            width: 2rem;
+            height: 2rem;
+            margin: 0rem;
+            padding: 0rem;
+        }
+
+        panel {
+            display: flex;
+            flex-direction: column;
+        }
+
+        panel>div {
+            display: flex;
+            flex: 1;
+            flex-direction: row;
+            align-items: center;
+        }
+    </style>
+</head>
+
+<body data-model="session">
+    <header>
+        <panel>
+            <div data-if="currentMode == 'Sequence'">
+                <p>Score {{score}}</p>
+                <p class="sequence" data-rml="sequence"></p>
+            </div>
+            <div data-if="currentMode == 'Time Attack'">
+                <p>Time {{time}}</p>
+            </div>
+        </panel>
+    </header>
+    <main>
+        <p data-if="countdown > 0">{{countdown}}</p>
+    </main>
+    <footer>
+        <button data-event-click="pauseSession()" style="visibility: hidden">Pause</button>
+    </footer>
+</body>
+
+</html>

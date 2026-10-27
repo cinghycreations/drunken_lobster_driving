@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>How to Play</title>
+    <link rel="stylesheet" type="text/css" href="/ui/common.css" />
+    <style>
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        panel {
+            width: 45rem;
+            padding: 0.5rem;
+            display: flex;
+            flex-direction: column;
+        }
+
+        p {
+            /* margin: 1rem 0rem; */
+            text-align: center;
+        }
+
+        p>img {
+            width: 1.5rem;
+            margin: 0rem;
+            padding: 0rem;
+        }
+
+        p.title {
+            margin: 1rem 0rem;
+            font-size: 1.5rem;
+        }
+    </style>
+</head>
+
+<body data-model="launcher">
+    <panel>
+        <p>Drive like a drunken lobster and destroy everything!</p>
+        <p class="title">Sequence Mode</p>
+        <p>Destroy streaks of identical buildings in a short time, for example:<img
+                src="/buildings/garden0000.image" /><img src="/buildings/garden0000.image" /><img
+                src="/buildings/garden0000.image" />or<img src="/buildings/gaspump0000.image" /><img
+                src="/buildings/gaspump0000.image" /><img src="/buildings/gaspump0000.image" /><img
+                src="/buildings/gaspump0000.image" /></p>
+        <p>Destroy Skyscrapers for a 2x multiplier and Nuclear plants for a 5x multiplier:<img
+                src="/buildings/skyscraper0000.image" /><img src="/buildings/nuclear0000.image" /></p>
+        <p class="title">Time Attack Mode</p>
+        <p>Destroy all buildings in the shortest time possible</p>
+        <p class="title"></p>
+        <button data-event-click="goToHome()">Back</button>
+    </panel>
+</body>
+
+</html>

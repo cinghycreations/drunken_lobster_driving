@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Pause</title>
+    <link rel="stylesheet" type="text/css" href="/ui/common.css" />
+    <style>
+        body {
+            display: flex;
+            flex-direction: column;
+        }
+
+        main {
+            display: flex;
+            flex: 1;
+            justify-content: center;
+            align-items: center;
+        }
+
+        panel {
+            width: 10rem;
+            padding: 0.5rem;
+            display: flex;
+            flex-direction: column;
+        }
+
+        panel>p {
+            font-size: 2rem;
+            text-align: center;
+        }
+
+        panel>button {
+            margin: 0.25rem;
+        }
+    </style>
+</head>
+
+<body data-model="session">
+    <main>
+        <panel>
+            <p>Pause</p>
+            <button data-event-click="resumeSession()">Resume</button>
+            <button data-event-click="restartSession()">Restart</button>
+            <button data-event-click="exitSession()">Exit</button>
+        </panel>
+    </main>
+</body>
+
+</html>

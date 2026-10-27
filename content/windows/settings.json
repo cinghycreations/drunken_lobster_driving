@@ -1,0 +1,94 @@
+{
+	"audio": {
+		"effectsGain": 0.20000000298023224,
+		"musicGain": 1.0
+	},
+	"camera": {
+		"shake": {
+			"blastRange": {
+				"x": 0.0,
+				"y": 2000.0
+			},
+			"durationRange": {
+				"x": 0.20000000298023224,
+				"y": 0.20000000298023224
+			},
+			"periodRange": {
+				"x": 0.05999999865889549,
+				"y": 0.05999999865889549
+			},
+			"strengthRange": {
+				"x": 0.019999999552965164,
+				"y": 0.019999999552965164
+			}
+		},
+		"zoom": 0.5
+	},
+	"car": {
+		"baseSpeed": 1.5,
+		"gamepadSensibility": 5.0,
+		"grip": 0.4000000059604645,
+		"keyboardSensibility": 5.0,
+		"mouseSensibility": 0.007499999832361937,
+		"size": 0.4000000059604645,
+		"speedMultiplierDecrease": 1.0,
+		"speedMultiplierRange": {
+			"x": 1.0,
+			"y": 2.0999999046325684
+		},
+		"speedMultiplierStackedRange": {
+			"x": 1.0,
+			"y": 2.0999999046325684
+		}
+	},
+	"gameplay": {
+		"garden": {
+			"speedMultiplierBonus": 3.0
+		},
+		"gaspump": {
+			"speedMultiplierBonus": 3.0
+		},
+		"house": {
+			"speedMultiplierBonus": 3.0
+		},
+		"nuclear": {
+			"speedMultiplierBonus": 3.0
+		},
+		"nuclearScoreMultiplier": 5.0,
+		"ranks": [
+			"Lame Lobster",
+			"Annoying Lobster",
+			"Infamous Lobster",
+			"Terrorist Lobster",
+			"Worst Lobster Ever"
+		],
+		"sequenceScoreExponent": 1.5,
+		"sequenceTime": 3.0,
+		"skyscraper": {
+			"speedMultiplierBonus": 3.0
+		},
+		"skyscraperScoreMultiplier": 2.0
+	},
+	"render": {
+		"backgroundColor": {
+			"x": 1.0,
+			"y": 0.8549019694328308,
+			"z": 0.7254902124404907
+		},
+		"backgroundDisplacement": 0.75,
+		"backgroundPeriod": 5.0,
+		"backgroundScale": 0.20000000298023224,
+		"framerateLimit": "Off",
+		"skidColor": {
+			"w": 0.7529411911964417,
+			"x": 0.501960813999176,
+			"y": 0.501960813999176,
+			"z": 0.501960813999176
+		},
+		"skidSize": 2.0,
+		"skidTileResolution": 128
+	},
+	"system": {
+		"updateTranslations": false
+	}
+}

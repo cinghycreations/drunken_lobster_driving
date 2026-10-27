@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Results</title>
+    <link rel="stylesheet" type="text/css" href="/ui/common.css" />
+    <style>
+        body {
+            display: flex;
+            flex-direction: column;
+        }
+
+        main {
+            display: flex;
+            flex: 1;
+            justify-content: center;
+            align-items: center;
+        }
+
+        panel {
+            width: 20rem;
+            padding: 0.5rem;
+            display: flex;
+            flex-direction: column;
+        }
+
+        panel>p {
+            font-size: 2rem;
+            text-align: center;
+            margin: 1rem;
+        }
+
+        panel>button {
+            margin: 0.25rem;
+        }
+    </style>
+</head>
+
+<body data-model="session">
+    <main>
+        <panel>
+            <p>Finished!</p>
+            <p data-if="currentMode == 'Sequence'">Score {{score}}</p>
+            <p data-if="currentMode == 'Time Attack'">Time {{time}}</p>
+            <p>{{finishedRank}}</p>
+            <button data-event-click="restartSession()">Restart</button>
+            <button data-event-click="exitSession()">Exit</button>
+        </panel>
+    </main>
+</body>
+
+</html>

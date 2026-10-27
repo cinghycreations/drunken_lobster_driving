@@ -83,7 +83,7 @@
         {
             "name": "windows-dev",
             "configurePreset": "windows-dev",
-            "configuration": "Debug"
+            "configuration": "RelWithDebInfo"
         },
         {
             "name": "windows-release",
@@ -93,7 +93,7 @@
         {
             "name": "linux-dev",
             "configurePreset": "linux-dev",
-            "configuration": "Debug"
+            "configuration": "RelWithDebInfo"
         },
         {
             "name": "linux-release",
@@ -103,7 +103,7 @@
         {
             "name": "html5-dev",
             "configurePreset": "html5-dev",
-            "configuration": "Debug"
+            "configuration": "RelWithDebInfo"
         },
         {
             "name": "html5-release",
@@ -113,7 +113,7 @@
         {
             "name": "android-dev",
             "configurePreset": "android-dev",
-            "configuration": "Debug"
+            "configuration": "RelWithDebInfo"
         },
         {
             "name": "android-release",

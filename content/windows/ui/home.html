@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Home</title>
+    <link rel="stylesheet" type="text/css" href="/ui/common.css" />
+    <style>
+        /* styling */
+
+        languages {
+            padding: 0.5rem;
+            gap: 0.5rem;
+        }
+
+        panel {
+            width: 45rem;
+            padding: 0.5rem;
+        }
+
+        panel>p {
+            font-size: 2.5rem;
+            text-align: center;
+            margin: 2rem 0rem;
+        }
+
+        panel button {
+            margin: 0.25rem;
+        }
+
+        img {
+            padding: 0.25rem;
+            width: 2rem;
+            height: 2rem;
+        }
+
+        img {
+            border-width: 0.1rem;
+            border-style: solid;
+            border-color: #1e90ff;
+            border-radius: 0.5rem;
+            background-color: #ffe4b5;
+        }
+
+        img:hover {
+            background-color: #ffd700;
+        }
+
+        copyright {
+            padding: 0rem 0.5rem;
+        }
+
+        /* layout */
+
+        body,
+        main,
+        panel,
+        panel>div,
+        footer,
+        copyright,
+        languages {
+            display: flex;
+        }
+
+        body {
+            flex-direction: column;
+        }
+
+        main {
+            flex: 1;
+            justify-content: center;
+            align-items: center;
+        }
+
+        panel {
+            flex-direction: column;
+        }
+
+        panel>div {
+            flex-direction: row;
+        }
+
+        panel>div>button {
+            flex: 1;
+        }
+
+        footer {
+            justify-content: space-between;
+        }
+
+        copyright {
+            flex-direction: column;
+            justify-content: center;
+        }
+    </style>
+</head>
+
+<body data-model="launcher">
+    <main>
+        <panel>
+            <p>Drunken Lobster Driving</p>
+            <div>
+                <button data-event-click="goToHowToPlay()">How to Play</button>
+                <button data-event-click="goToDrive()">Drive</button>
+                <button data-event-click="goToCredits()">Credits</button>
+                <button data-event-click="quit()">Quit</button>
+            </div>
+        </panel>
+    </main>
+    <footer>
+        <copyright>
+            <p>{{buildVersion}} - {{buildDate}}</p>
+        </copyright>
+        <languages>
+            <img src="/ui/italy.image" data-event-click="selectLanguage('it')" />
+            <img src="/ui/uk.image" data-event-click="selectLanguage('en')" />
+        </languages>
+    </footer>
+</body>
+
+</html>
