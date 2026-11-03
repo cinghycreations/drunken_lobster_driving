@@ -1,0 +1,11 @@
+namespace data;
+
+enum ImageType : byte { Png, Webp }
+
+table Image {
+  type: ImageType;
+  data: [ubyte];
+}
+
+root_type Image;
+file_identifier "IMGE";

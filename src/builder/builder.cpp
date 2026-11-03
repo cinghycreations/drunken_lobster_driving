@@ -9,6 +9,7 @@
 #include <fmt/printf.h>
 #include <fmt/std.h>
 #include <fstream>
+#include <game.fb.h>
 #include <iterator>
 #include <string>
 #include <string_view>
@@ -123,7 +124,8 @@ static void copyFilter(const std::filesystem::path& in, const std::filesystem::p
 }
 
 static void image(const std::filesystem::path& in, const std::filesystem::path& out, const bool webp) {
-	Image image;
+
+	flatbuffers::FlatBufferBuilder builder;
 
 	if (!webp) {
 		size_t data_size = 0;
@@ -132,8 +134,14 @@ static void image(const std::filesystem::path& in, const std::filesystem::path& 
 			throw BuildException(fmt::format("Failed to load image {}: {}", in, SDL_GetError()));
 		}
 
-		image.type = ImageType::Png;
-		image.data.assign(static_cast<const uint8_t*>(data), static_cast<const uint8_t*>(data) + data_size);
+		flatbuffers::Offset<flatbuffers::Vector<uint8_t>> image_data = builder.CreateVector(reinterpret_cast<const uint8_t*>(data), data_size);
+
+		data::ImageBuilder image_builder(builder);
+		image_builder.add_type(data::ImageType_Png);
+		image_builder.add_data(image_data);
+		const flatbuffers::Offset<data::Image> image = image_builder.Finish();
+		data::FinishImageBuffer(builder, image);
+
 		SDL_free(data);
 	} else {
 		SDL_Surface* surface = IMG_Load(reinterpret_cast<const char*>(in.u8string().c_str()));
@@ -156,16 +164,19 @@ static void image(const std::filesystem::path& in, const std::filesystem::path& 
 
 		const uint8_t* data = static_cast<const uint8_t*>(SDL_GetPointerProperty(SDL_GetIOProperties(stream), SDL_PROP_IOSTREAM_DYNAMIC_MEMORY_POINTER, nullptr));
 		const Sint64 data_size = SDL_GetIOSize(stream);
-		image.type = ImageType::Webp;
-		image.data.assign(data, data + data_size);
+
+		flatbuffers::Offset<flatbuffers::Vector<uint8_t>> image_data = builder.CreateVector(reinterpret_cast<const uint8_t*>(data), data_size);
+		data::ImageBuilder image_builder(builder);
+		image_builder.add_type(data::ImageType_Webp);
+		image_builder.add_data(image_data);
+		const flatbuffers::Offset<data::Image> image = image_builder.Finish();
+		data::FinishImageBuffer(builder, image);
+
 		SDL_CloseIO(stream);
 	}
 
-	const nlohmann::json json = image;
-	const std::vector<uint8_t> cbor = nlohmann::json::to_cbor(json);
-
 	std::ofstream out_stream(out, std::ios::binary);
-	out_stream.write(reinterpret_cast<const char*>(cbor.data()), cbor.size());
+	out_stream.write(reinterpret_cast<const char*>(builder.GetBufferPointer()), builder.GetSize());
 	if (!out_stream) {
 		throw BuildException(fmt::format("Failed to save image {}", out));
 	}

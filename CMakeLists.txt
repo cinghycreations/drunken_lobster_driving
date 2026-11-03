@@ -8,6 +8,7 @@ option( CC_HAS_BUILDER "Add builder project" ON )
 option( CC_HAS_DEVUI "Enable Dev Ui" ON )
 
 set( BUILD_SHARED_LIBS OFF )
+set( FLATBUFFERS_BUILD_TESTS OFF )
 set( RMLUI_BACKEND "SDL_SDLrenderer" )
 set( SDL_STATIC ON )
 set( SDLIMAGE_AVIF OFF )
@@ -31,6 +32,7 @@ set( SDLIMAGE_XCF OFF )
 set( SDLIMAGE_XPM OFF )
 set( SDLIMAGE_XV OFF )
 add_subdirectory( ext/CLI11 EXCLUDE_FROM_ALL )
+add_subdirectory( ext/flatbuffers EXCLUDE_FROM_ALL )
 add_subdirectory( ext/fmt EXCLUDE_FROM_ALL )
 add_subdirectory( ext/freetype EXCLUDE_FROM_ALL )
 add_subdirectory( ext/glm EXCLUDE_FROM_ALL )
@@ -81,11 +83,24 @@ target_link_libraries( RmlUiBackend PUBLIC RmlUi::Core SDL3-static SDL3_image-st
 add_library( stb INTERFACE )
 target_include_directories( stb INTERFACE ext/stb )
 
-add_library( gamelib src/gamelib/gamelib.cpp src/gamelib/gamelib.hpp )
+if ( NOT CMAKE_CROSSCOMPILING )
+	add_custom_command(
+		OUTPUT "${CMAKE_CURRENT_SOURCE_DIR}/src/gamelib/game.fb.h"
+		COMMAND flatc --cpp --filename-suffix .fb -o "${CMAKE_CURRENT_SOURCE_DIR}/src/gamelib" "${CMAKE_CURRENT_SOURCE_DIR}/src/gamelib/game.fbs"
+		DEPENDS flatc "${CMAKE_CURRENT_SOURCE_DIR}/src/gamelib/game.fbs"
+		COMMENT "flatc generation: src/gamelib/game.fbs -> src/gamelib/game.fb.h"
+	)
+endif()
+add_library( gamelib
+	"${CMAKE_CURRENT_SOURCE_DIR}/src/gamelib/game.fb.h"
+	src/gamelib/game.fbs
+	src/gamelib/gamelib.cpp
+	src/gamelib/gamelib.hpp
+)
 target_include_directories( gamelib PUBLIC src/gamelib )
 target_compile_definitions( gamelib PUBLIC GLM_ENABLE_EXPERIMENTAL SDL_ASSERT_LEVEL=2 )
 target_compile_definitions( gamelib PUBLIC CC_VERSION_MAJOR="${CMAKE_PROJECT_VERSION_MAJOR}" CC_VERSION_MINOR="${CMAKE_PROJECT_VERSION_MINOR}" CC_VERSION_PATCH="${CMAKE_PROJECT_VERSION_PATCH}" CC_VERSION_BUILD="${CMAKE_PROJECT_VERSION_TWEAK}" )
-target_link_libraries( gamelib PUBLIC SDL3-static SDL3_image-static fmt glm nlohmann_json tileson RmlUiBackend stb )
+target_link_libraries( gamelib PUBLIC SDL3-static SDL3_image-static fmt glm nlohmann_json tileson RmlUiBackend stb flatbuffers )
 if ( CC_HAS_DEVUI )
 	target_link_libraries( gamelib PUBLIC ImGuiBackend RmlUi::Debugger )
 	target_compile_definitions( gamelib PUBLIC CC_HAS_DEVUI )

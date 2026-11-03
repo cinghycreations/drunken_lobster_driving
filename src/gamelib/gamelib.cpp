@@ -268,40 +268,52 @@ void Audio::loopingCallback(void* userdata, SDL_AudioStream* stream, int additio
 // Content //
 /////////////
 
-static const char* getImageTypeName(const ImageType type) {
-	SDL_assert(type == ImageType::Png || type == ImageType::Webp);
-	return (type == ImageType::Webp) ? "WEBP" : "PNG";
+static const char* getImageTypeName(const data::ImageType type) {
+	SDL_assert(type == data::ImageType_Png || type == data::ImageType_Webp);
+	return (type == data::ImageType_Webp) ? "WEBP" : "PNG";
 }
 
-Image Image::load(const Storage& storage, const std::filesystem::path& path) {
+std::shared_ptr<SDL_Surface> ImageUtils::createSurface(const Storage& storage, const std::filesystem::path& path) {
 	SDL_IOStream* stream = storage.open(path);
 	SDL_assert(stream);
 
 	size_t data_size = 0;
 	void* data = SDL_LoadFile_IO(stream, &data_size, true);
 	SDL_assert(data);
+	SDL_assert(data::ImageBufferHasIdentifier(data));
 
-	const nlohmann::json json = nlohmann::json::from_cbor(static_cast<uint8_t*>(data), static_cast<uint8_t*>(data) + data_size);
-	const Image image = json;
-	SDL_free(data);
-	return image;
-}
+	const data::Image* image = data::GetImage(data);
 
-std::shared_ptr<SDL_Surface> Image::createSurface(const Image& image) {
-	SDL_IOStream* stream = SDL_IOFromConstMem(image.data.data(), image.data.size());
-	SDL_assert(stream);
+	SDL_IOStream* image_stream = SDL_IOFromConstMem(image->data()->data(), image->data()->size());
+	SDL_assert(image_stream);
 
-	SDL_Surface* surface = IMG_LoadTyped_IO(stream, true, getImageTypeName(image.type));
+	SDL_Surface* surface = IMG_LoadTyped_IO(image_stream, true, getImageTypeName(image->type()));
 	SDL_assert(surface);
+
+	SDL_free(data);
+
 	return std::shared_ptr<SDL_Surface>(surface, &SDL_DestroySurface);
 }
 
-std::shared_ptr<SDL_Texture> Image::createTexture(const Image& image, SDL_Renderer* renderer) {
-	SDL_IOStream* stream = SDL_IOFromConstMem(image.data.data(), image.data.size());
+std::shared_ptr<SDL_Texture> ImageUtils::createTexture(const Storage& storage, const std::filesystem::path& path, SDL_Renderer* renderer) {
+	SDL_IOStream* stream = storage.open(path);
 	SDL_assert(stream);
 
-	SDL_Texture* texture = IMG_LoadTextureTyped_IO(renderer, stream, true, getImageTypeName(image.type));
+	size_t data_size = 0;
+	void* data = SDL_LoadFile_IO(stream, &data_size, true);
+	SDL_assert(data);
+	SDL_assert(data::ImageBufferHasIdentifier(data));
+
+	const data::Image* image = data::GetImage(data);
+
+	SDL_IOStream* image_stream = SDL_IOFromConstMem(image->data()->data(), image->data()->size());
+	SDL_assert(image_stream);
+
+	SDL_Texture* texture = IMG_LoadTextureTyped_IO(renderer, image_stream, true, getImageTypeName(image->type()));
 	SDL_assert(texture);
+
+	SDL_free(data);
+
 	return std::shared_ptr<SDL_Texture>(texture, &SDL_DestroyTexture);
 }
 
@@ -313,7 +325,7 @@ Flipbook::Flipbook(Storage& storage, SDL_Renderer* renderer, const char* pattern
 			break;
 		}
 
-		textures.push_back(Image::createTexture(Image::load(storage, path), renderer));
+		textures.push_back(ImageUtils::createTexture(storage, path, renderer));
 
 		++index;
 	}
@@ -1627,7 +1639,7 @@ Rml::TextureHandle RenderInterface::LoadTexture(Rml::Vector2i& texture_dimension
 		return {};
 	}
 
-	const std::shared_ptr<SDL_Surface> surface = Image::createSurface(Image::load(storage, path));
+	const std::shared_ptr<SDL_Surface> surface = ImageUtils::createSurface(storage, path);
 	SDL_Surface* rgba_surface = SDL_ConvertSurface(surface.get(), SDL_PIXELFORMAT_RGBA32);
 	SDL_assert(rgba_surface);
 	SDL_assert(rgba_surface->pitch == rgba_surface->w * 4);

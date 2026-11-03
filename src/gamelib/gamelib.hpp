@@ -12,6 +12,7 @@
 #include <chrono>
 #include <filesystem>
 #include <functional>
+#include <game.fb.h>
 #include <glm/glm.hpp>
 #include <list>
 #include <memory>
@@ -247,25 +248,25 @@ private:
 // Content //
 /////////////
 
-enum class ImageType {
-	Png,
-	Webp,
-};
+// enum class ImageType {
+//	Png,
+//	Webp,
+// };
+//
+// NLOHMANN_JSON_SERIALIZE_ENUM(ImageType, {
+//											{ImageType::Png, "Png"},
+//											{ImageType::Webp, "Webp"},
+//										});
 
-NLOHMANN_JSON_SERIALIZE_ENUM(ImageType, {
-											{ImageType::Png, "Png"},
-											{ImageType::Webp, "Webp"},
-										});
+struct ImageUtils {
+	// ImageType type;
+	// nlohmann::json::binary_t data;
 
-struct Image {
-	ImageType type;
-	nlohmann::json::binary_t data;
+	// static Image load(const Storage& storage, const std::filesystem::path& path);
+	static std::shared_ptr<SDL_Surface> createSurface(const Storage& storage, const std::filesystem::path& path);
+	static std::shared_ptr<SDL_Texture> createTexture(const Storage& storage, const std::filesystem::path& path, SDL_Renderer* renderer);
 
-	static Image load(const Storage& storage, const std::filesystem::path& path);
-	static std::shared_ptr<SDL_Surface> createSurface(const Image& image);
-	static std::shared_ptr<SDL_Texture> createTexture(const Image& image, SDL_Renderer* renderer);
-
-	NLOHMANN_DEFINE_TYPE_INTRUSIVE(Image, type, data);
+	// NLOHMANN_DEFINE_TYPE_INTRUSIVE(Image, type, data);
 };
 
 struct Flipbook {
